@@ -1,0 +1,79 @@
+name: Aggiorna FantaLab Pro e pubblica su Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '37 4 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fantalab-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Scarica i sorgenti
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepara Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Configura GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Verifica pipeline e snapshot
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py'
+          python tools/update_data.py --validate-only data/serie-a-2026-27.json
+      - name: Aggiorna i dati dalle fonti configurate
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          API_FOOTBALL_PUBLISH_ALLOWED: ${{ vars.API_FOOTBALL_PUBLISH_ALLOWED }}
+          API_FOOTBALL_REQUEST_BUDGET: ${{ vars.API_FOOTBALL_REQUEST_BUDGET }}
+          FANTALAB_METRICS_URL: ${{ secrets.FANTALAB_METRICS_URL }}
+          FANTALAB_METRICS_BEARER: ${{ secrets.FANTALAB_METRICS_BEARER }}
+          METRICS_PUBLISH_ALLOWED: ${{ vars.METRICS_PUBLISH_ALLOWED }}
+        shell: bash
+        run: |
+          options=()
+          if [[ "${API_FOOTBALL_PUBLISH_ALLOWED,,}" == true ]]; then
+            options+=(--with-api-football)
+          fi
+          if [[ "${METRICS_PUBLISH_ALLOWED,,}" == true ]]; then
+            options+=(--with-metrics)
+          fi
+          python tools/update_data.py "${options[@]}" --output "$RUNNER_TEMP/fantalab-snapshot.json"
+      - name: Seleziona i file pubblici
+        run: python tools/stage_site.py "$RUNNER_TEMP/fantalab-site" --snapshot "$RUNNER_TEMP/fantalab-snapshot.json"
+      - name: Carica il sito
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/fantalab-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Pubblica su GitHub Pages
+        id: publish
+        uses: actions/deploy-pages@v4
