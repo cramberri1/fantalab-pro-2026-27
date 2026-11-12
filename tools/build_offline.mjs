@@ -32,22 +32,31 @@ async function inlineStyles(css) {
   return css;
 }
 
-function inlineModules(model, app) {
-  const names = [];
-  const body = model.replace(/^export (const|function) ([A-Za-z_$][\w$]*)/gm, (_, type, name) => {
-    names.push(name);
-    return `${type} ${name}`;
-  });
-  const entry = replaceRequired(app, /^import \{\s*([\w$,\s]+)\s*\} from ['"]\.\/model\.js['"];\s*/m, (_, bindings) => {
-    if (bindings.split(',').map(binding => binding.trim()).filter(Boolean).some(name => !names.includes(name))) {
-      throw new Error('L’app importa un simbolo assente dal modello.');
+function inlineModules(app, modules) {
+  let entry = app;
+  const declarations = modules.map(({ path, namespace, source }) => {
+    const names = [];
+    const body = source.replace(/^export (const|function) ([A-Za-z_$][\w$]*)/gm, (_, type, name) => {
+      names.push(name);
+      return `${type} ${name}`;
+    });
+    const dependency = path.replaceAll('.', '\\.');
+    const importPattern = new RegExp(`^import \\{\\s*([\\w$,\\s]+)\\s*\\} from ['"]\\.\\/${dependency}['"];\\s*`, 'm');
+    entry = replaceRequired(entry, importPattern, (_, bindings) => {
+      if (bindings.split(',').map(binding => binding.trim()).filter(Boolean).some(name => !names.includes(name))) {
+        throw new Error(`L’app importa un simbolo assente da ${path}.`);
+      }
+      return `const { ${bindings.trim()} } = ${namespace};\n\n`;
+    });
+    if (/^\s*(import|export)\s/m.test(body)) {
+      throw new Error(`Il bundler supporta soltanto gli export nominali in ${path}.`);
     }
-    return `const { ${bindings.trim()} } = FantaLabModel;\n\n`;
+    return `const ${namespace} = (() => {\n${body}\nreturn { ${names.join(', ')} };\n})();`;
   });
-  if (/^\s*(import|export)\s/m.test(body) || /^\s*(import|export)\s/m.test(entry)) {
-    throw new Error('Il bundler supporta soltanto gli export nominali del modello e il relativo import.');
+  if (/^\s*(import|export)\s/m.test(entry)) {
+    throw new Error('L’app contiene un import o export non incorporato.');
   }
-  const code = `const FantaLabModel = (() => {\n${body}\nreturn { ${names.join(', ')} };\n})();\n\n${entry}`;
+  const code = [...declarations, entry].join('\n\n');
   if (code.includes('<!--')) throw new Error('Commento HTML in un modulo JavaScript.');
   return code.replace(/<\/script/gi, match => match.replace('/', '\\/'));
 }
@@ -66,12 +75,16 @@ function replaceRequired(value, pattern, replacement) {
   return value.replace(pattern, replacement);
 }
 
-const [html, css, icon, model, app, real, demo] = await Promise.all([
+const [html, css, icon, model, rosterImport, app, real, demo] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
-  read('js/app.js'), read('data/serie-a-2026-27.json'), read('data/demo.json')
+  read('js/roster-import.js'), read('js/app.js'), read('data/serie-a-2026-27.json'), read('data/demo.json')
 ]);
 const styles = await inlineStyles(css);
-const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'), `<script type="module">\n${inlineModules(model, app)}\n</script>`];
+const modules = [
+  { path: 'model.js', namespace: 'FantaLabModel', source: model },
+  { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport }
+];
+const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'), `<script type="module">\n${inlineModules(app, modules)}\n</script>`];
 const withIcon = replaceRequired(html, /(<link rel="icon" href=")assets\/mark\.svg(")/, (_, start, end) => start + icon + end);
 const withStyles = replaceRequired(withIcon, /<link rel="stylesheet" href="styles\.css">/, () => `<style>\n${styles}\n</style>`);
 const output = replaceRequired(withStyles, /<script type="module" src="js\/app\.js"><\/script>/, () => scripts.join('\n  '));
