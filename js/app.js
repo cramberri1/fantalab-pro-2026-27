@@ -1,4 +1,5 @@
 import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture } from './model.js';
+import { decodeRosterCsv, makeRosterCsvId, readRosterCsv } from './roster-import.js';
 
 const PAGES = {
   panoramica: 'Panoramica', match: 'Match Center', giocatori: 'Calciatori',
@@ -89,6 +90,15 @@ function sanitizeBackup(raw) {
     const saved = raw?.[m];
     if (!saved || typeof saved !== 'object') continue;
     clean[m].roster = ids(saved.roster);
+    if (m === 'real') {
+      clean[m].rosterLocals = {};
+      for (const id of clean[m].roster) {
+        const player = saved.rosterLocals?.[id];
+        if (!player || makeRosterCsvId(player.name, player.teamId, player.position) !== id) continue;
+        const { name, teamId, position } = player;
+        clean[m].rosterLocals[id] = { id, name, teamId, position };
+      }
+    }
     clean[m].round = Number.isInteger(saved.round) && saved.round >= 1 && saved.round <= 38 ? saved.round : undefined;
     clean[m].lineups = {};
     for (const [key, value] of Object.entries(saved.lineups ?? {})) {
@@ -116,6 +126,7 @@ function save() {
 function modeState() {
   const saved = storage[mode];
   saved.roster ??= [];
+  saved.rosterLocals ??= {};
   saved.lineups ??= {};
   return saved;
 }
@@ -148,7 +159,9 @@ function byRound() {
   );
 }
 function getTeam(id) { return dataset.teamMap.get(id); }
-function getPlayer(id) { return dataset.playerMap.get(id); }
+function getPlayer(id) {
+  return dataset.playerMap.get(id) ?? (typeof id === 'string' && id.startsWith('csv:') ? modeState().rosterLocals[id] : undefined);
+}
 function groupPlayers(ids) { return ids.map(getPlayer).filter(Boolean); }
 function status(label, state) { return `<span class="status ${html(state)}">${html(label)}</span>`; }
 function coverageRows(keys = Object.keys(COVERAGE)) {
@@ -479,6 +492,7 @@ function showPlayer(id) {
   const opponent = a.fixture ? getTeam(a.fixture.homeId === p.teamId ? a.fixture.awayId : a.fixture.homeId) : null;
   dialog.innerHTML = `<button class="dialog-close" data-close-dialog aria-label="Chiudi scheda">✕</button>
     <div class="eyebrow">${mode === 'demo' ? 'Demo · ' : ''}${html(getTeam(p.teamId)?.shortName)} · ${ROLES[p.position] ?? 'Ruolo mancante'}</div><h2 id="player-title">${html(p.name)}</h2>
+    ${p.id.startsWith('csv:') ? '<p class="inline-status">Nome, squadra e ruolo provengono dal tuo CSV. Le statistiche di listone sono mancanti.</p>' : ''}
     <div class="detail-grid">
       ${stat('Minuti', number(p.minutes))}${stat('Presenze', number(p.appearances))}${stat('Gol', number(p.goals))}${stat('Assist', number(p.assists))}
       ${stat('xG', number(p.xg, 2))}${stat('xA', number(p.xa, 2))}${stat('xG / 90', number(per90(p.xg, p.minutes), 2))}${stat('xA / 90', number(per90(p.xa, p.minutes), 2))}
@@ -503,7 +517,7 @@ function showPlayer(id) {
   }
 }
 
-let importReport = '';
+let importReport;
 function preset() {
   const demo = dataset.demoPreset;
   if (!demo || mode !== 'demo') return;
@@ -529,6 +543,7 @@ function addPlayer(id) {
 function removePlayer(id) {
   const state = modeState();
   state.roster = state.roster.filter(value => value !== id);
+  delete state.rosterLocals[id];
   for (const record of Object.values(state.lineups)) {
     record.starters = record.starters.filter(value => value !== id);
     record.reserves = record.reserves.filter(value => value !== id);
@@ -594,6 +609,7 @@ function rosa() {
       ${roster.length ? `<ul class="roster-list">${roster.map(p => {
         const active = record.starters.includes(p.id) ? 'starter' : record.reserves.includes(p.id) ? 'reserve' : 'none';
         return `<li><span class="team-code">${SHORT[p.position] ?? '—'}</span><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>
+          ${p.id.startsWith('csv:') ? status('Da CSV · senza statistiche', 'partial') : ''}
           <select data-lineup-role="${html(p.id)}" aria-label="Impiego di ${html(p.name)}">${[['none','Fuori'],['starter','Titolare'],['reserve','Panchina']].map(([key,label]) => `<option value="${key}" ${key === active ? 'selected' : ''}>${label}</option>`).join('')}</select>
           <button data-remove="${html(p.id)}" aria-label="Rimuovi ${html(p.name)}">✕</button></li>`;
       }).join('')}</ul>` : empty('Aggiungi calciatori dal listone o importa un CSV.')}
@@ -601,8 +617,12 @@ function rosa() {
       <div class="file-actions"><label class="btn button-file">Importa rosa CSV<input type="file" accept=".csv,text/csv" id="roster-csv" aria-label="Importa rosa CSV"></label>
       <button data-csv-template>Modello CSV</button><button data-export>Esporta backup</button>
       <label class="btn button-file">Importa backup<input type="file" accept=".json,application/json" id="backup-json" aria-label="Importa backup"></label></div>
-      <p class="inline-status">CSV con colonna id o nome e, facoltativamente, squadra. Il backup contiene entrambe le modalità.</p>
-      ${importReport ? `<p class="notice neutral" role="status">${html(importReport)}</p>` : ''}
+      <p class="inline-status">Puoi usare l’export Classic di Fantacalcio.it o il modello CSV. L’importazione aggiunge i calciatori alla rosa salvata.</p>
+      ${importReport ? `<div class="notice neutral"><p role="status">${html(importReport.message)}</p>
+        ${importReport.unresolved?.length ? `<details><summary>Righe da verificare</summary><ul>
+          ${importReport.unresolved.slice(0, 50).map(row => `<li>${html(row.label)} · ${html(row.reason)}</li>`).join('')}
+          ${importReport.unresolved.length > 50 ? '<li>Mostrate le prime 50 righe.</li>' : ''}
+        </ul></details>` : ''}</div>` : ''}
     </section>
     <section class="panel">
       <div class="panel-head"><div><h2>Formazione</h2><p>Giornata ${round}</p></div>${status(validation.valid ? '11 titolari validi' : `${starters.length} / 11 titolari`, validation.valid ? 'available' : 'partial')}</div>
@@ -616,53 +636,45 @@ function rosa() {
     </section>
   </div>`;
 }
-function parseCsv(text) {
-  const delimiter = text.split(/\r?\n/, 1)[0].includes(';') ? ';' : ',';
-  const rows = [[]];
-  let value = '';
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '"') {
-      if (quoted && text[i + 1] === '"') { value += '"'; i++; }
-      else quoted = !quoted;
-    } else if (!quoted && ch === delimiter) {
-      rows.at(-1).push(value.trim()); value = '';
-    } else if (!quoted && (ch === '\r' || ch === '\n')) {
-      if (ch === '\r' && text[i + 1] === '\n') i++;
-      rows.at(-1).push(value.trim()); value = ''; rows.push([]);
-    } else value += ch;
+function linkRosterPlayer(state, localId, id) {
+  const replace = values => [...new Set(values.map(value => value === localId ? id : value))];
+  state.roster = replace(state.roster);
+  for (const record of Object.values(state.lineups)) {
+    record.starters = replace(record.starters);
+    record.reserves = replace(record.reserves).filter(value => !record.starters.includes(value));
   }
-  if (quoted) throw new Error('CSV con virgolette non chiuse.');
-  rows.at(-1).push(value.trim());
-  return rows.filter(row => row.some(Boolean));
+  delete state.rosterLocals[localId];
+  simulationResult = undefined;
 }
 function importCsv(text) {
-  const rows = parseCsv(text.replace(/^\uFEFF/, ''));
-  const headers = (rows.shift() ?? []).map(normalized);
-  const idColumn = headers.indexOf('id');
-  const nameColumn = headers.findIndex(column => ['nome','name','calciatore'].includes(column));
-  const teamColumn = headers.findIndex(column => ['squadra','team','club'].includes(column));
-  if (idColumn < 0 && nameColumn < 0) throw new Error('Il CSV deve avere un’intestazione con id o nome.');
+  const { entries, unresolved } = readRosterCsv(text, dataset);
   const state = modeState();
-  const seen = new Set(state.roster);
-  const unresolved = [];
   let added = 0;
-  for (const row of rows) {
-    const suppliedId = row[idColumn];
-    const name = normalized(row[nameColumn]);
-    const team = normalized(row[teamColumn]);
-    const candidates = suppliedId ? [getPlayer(suppliedId)].filter(Boolean)
-      : dataset.players.filter(p => {
-        const club = getTeam(p.teamId);
-        return name && normalized(p.name) === name && (!team || [club?.shortName, club?.name, club?.code].some(value => normalized(value) === team));
-      });
-    if (candidates.length !== 1) { unresolved.push(suppliedId || row[nameColumn] || 'Riga senza nome'); continue; }
-    const { id } = candidates[0];
-    if (!seen.has(id)) { state.roster.push(id); seen.add(id); added++; }
+  let duplicates = 0;
+  let localAdded = 0;
+  let linked = 0;
+  for (const { id, localId, local } of entries) {
+    if (localId && id !== localId && state.rosterLocals[localId]) {
+      linkRosterPlayer(state, localId, id);
+      linked++;
+    } else if (state.roster.includes(id)) {
+      duplicates++;
+    } else if (state.roster.length >= 1000) {
+      unresolved.push({ label: local?.name ?? getPlayer(id)?.name ?? id, reason: 'Limite della rosa raggiunto' });
+    } else {
+      state.roster.push(id);
+      added++;
+      if (local) {
+        state.rosterLocals[id] = local;
+        localAdded++;
+      }
+    }
   }
   save();
-  return `${added} aggiunti, ${rows.length - added - unresolved.length} già in rosa, ${unresolved.length} da verificare.${unresolved.length ? ` ${unresolved.slice(0, 8).join(', ')}${unresolved.length > 8 ? ', …' : ''}.` : ''}`;
+  const counts = `${added} aggiunti, ${duplicates} già in rosa, ${unresolved.length} da verificare.`;
+  const localSummary = localAdded ? ` ${localAdded} da CSV senza statistiche.` : '';
+  const linkedSummary = linked ? ` ${linked} voci da CSV collegate al listone.` : '';
+  return { message: counts + localSummary + linkedSummary, unresolved };
 }
 function restoreBackup(text) {
   const file = JSON.parse(text);
@@ -674,6 +686,7 @@ function restoreBackup(text) {
   for (const m of ['real', 'demo']) {
     const base = storage[m];
     base.roster = [...new Set([...(base.roster ?? []), ...(incoming[m].roster ?? [])])];
+    base.rosterLocals = { ...incoming[m].rosterLocals, ...base.rosterLocals };
     base.lineups ??= {};
     for (const [day, record] of Object.entries(incoming[m].lineups ?? {})) {
       const existing = base.lineups[day];
@@ -774,7 +787,7 @@ function wireEvents() {
     const control = event.target.closest('button');
     if (!control) return;
     const data = control.dataset;
-    if (data.mode) { if (data.mode !== mode || pageView.getAttribute('aria-busy') === 'true') { importReport = ''; void switchMode(data.mode); } return; }
+    if (data.mode) { if (data.mode !== mode || pageView.getAttribute('aria-busy') === 'true') { importReport = undefined; void switchMode(data.mode); } return; }
     if (!dataset) return;
     if (data.fixture) {
       selectedFixtureId = data.fixture;
@@ -840,10 +853,10 @@ function wireEvents() {
       const activeMode = mode;
       try {
         if (file.size > 2_000_000) throw new Error('Il file supera 2 MB.');
-        const text = await file.text();
+        const text = id === 'roster-csv' ? decodeRosterCsv(await file.arrayBuffer()) : await file.text();
         if (activeMode !== mode) return;
-        importReport = id === 'roster-csv' ? importCsv(text) : restoreBackup(text);
-      } catch (error) { importReport = error instanceof SyntaxError ? 'Backup JSON non valido.' : error.message; }
+        importReport = id === 'roster-csv' ? importCsv(text) : { message: restoreBackup(text) };
+      } catch (error) { importReport = { message: error instanceof SyntaxError ? 'Backup JSON non valido.' : error.message }; }
       render();
     }
   });
