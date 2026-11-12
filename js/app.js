@@ -1,16 +1,19 @@
 import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture } from './model.js';
 import { decodeRosterCsv, makeRosterCsvId, readRosterCsv } from './roster-import.js';
+import { readMarketWorkbook } from './market-import.js';
+import { buildMarket, rankMarketReplacements, compareMarketTrade } from './market.js';
 
 const PAGES = {
   panoramica: 'Panoramica', match: 'Match Center', giocatori: 'Calciatori',
-  rosa: 'La mia rosa', simulazione: 'Simulazione', fonti: 'Fonti e metodo'
+  rosa: 'La mia rosa', mercato: 'Mercato', simulazione: 'Simulazione', fonti: 'Fonti e metodo'
 };
 const ROLES = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrocampista', FWD: 'Attaccante' };
 const SHORT = { GK: 'P', DEF: 'D', MID: 'C', FWD: 'A' };
 const COVERAGE = {
   fixtures: 'Calendario', results: 'Risultati', players: 'Listone calciatori',
   playerStats: 'Statistiche individuali', ratings: 'Voti storici FantaTB', expectedGoals: 'xG individuali',
-  expectedAssists: 'xA individuali', absences: 'Indisponibilità'
+  expectedAssists: 'xA individuali', teamExpectedGoals: 'xG stagionali di squadra', fixtureExpectedGoals: 'xG delle singole partite',
+  absences: 'Indisponibilità'
 };
 const STATUS = { available: 'Disponibile', partial: 'Parziale', missing: 'Mancante', demo: 'Demo' };
 const ICONS = {
@@ -19,6 +22,7 @@ const ICONS = {
   pitch: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M3 9h4v6H3m18-6h-4v6h4"/><circle cx="12" cy="12" r="2.5"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-4m-3-12a4 4 0 0 1 0 8"/><circle cx="9" cy="7" r="4"/>',
   shirt: '<path d="m8 3-5 3-2 5 4 2 2-3v11h10V10l2 3 4-2-2-5-5-3a4 4 0 0 1-8 0z"/>',
+  market: '<path d="M4 8h15m-4-4 4 4-4 4M20 16H5m4 4-4-4 4-4"/>',
   chart: '<path d="M3 3v18h18M7 15l4-4 3 3 6-7"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14a8 3 0 0 0 16 0V5M4 12a8 3 0 0 0 16 0"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/>',
@@ -29,14 +33,17 @@ const dateFormatter = new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome'
 const timeFormatter = new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' });
 const calendarDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const KEY = 'fantalab-pro/2026-27/v1';
+const MARKET_KEY = 'fantalab-pro/2026-27/mercato/v1/';
+const MARKET_UPLOADS = { listone: 'Listone completo', svincolati: 'Svincolati della lega' };
 const PER_PAGE = 24;
 const $ = (selector) => document.querySelector(selector);
 const pageView = $('#view');
 const dialog = $('#player-dialog');
 const cache = new Map();
 const filters = { search: '', position: '', team: '', sort: 'name', page: 1 };
+const marketFilters = { tab: 'riparazione', search: '', role: '', outgoing: '', incoming: '', budget: '', credits: '', page: 1 };
 const selectedComparison = { real: [], demo: [] };
-const views = { panoramica, match, giocatori, rosa, simulazione, fonti };
+const views = { panoramica, match, giocatori, rosa, mercato, simulazione, fonti };
 let dataset;
 let mode = 'real';
 let round = 1;
@@ -48,6 +55,10 @@ let toastTimer;
 let persistenceWarned = false;
 let lastFocus;
 let storage = readStorage();
+let marketImports = Object.fromEntries(Object.keys(MARKET_UPLOADS).map(kind => [kind, readMarketSource(kind)]));
+let marketCache;
+let marketNotice = '';
+const marketReadVersion = { listone: 0, svincolati: 0 };
 
 function html(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => (
@@ -309,7 +320,7 @@ function panoramica() {
   </section>
   <div class="split">
     <section class="panel"><div class="panel-head"><div><h2>Partite della giornata</h2><p>Giornata ${round} · ${fixtures.length} incontri</p></div><a class="text-link" href="#match">Tutti gli incontri →</a></div>${fixtureList(fixtures.slice(0, 5))}</section>
-    <section class="panel"><div class="panel-head"><h2>Copertura dati</h2><a class="text-link" href="#fonti">Vedi fonti →</a></div>${coverageRows(['fixtures','results','players','ratings','expectedGoals','expectedAssists','absences'])}</section>
+    <section class="panel"><div class="panel-head"><h2>Copertura dati</h2><a class="text-link" href="#fonti">Vedi fonti →</a></div>${coverageRows(['fixtures','results','players','ratings','teamExpectedGoals','expectedGoals','expectedAssists','absences'])}</section>
   </div>`;
 }
 function previousForm(teamId, fixture) {
@@ -360,6 +371,19 @@ function threeWay(home, away) {
 function formSummary(form) {
   return form ? `${form.n} partite acquisite · G${form.oldestRound}–G${form.newestRound} · ${number(form.gf, 2)} gol fatti / ${number(form.ga, 2)} subiti a partita` : 'Meno di tre risultati precedenti acquisiti';
 }
+function sourceLink(id) {
+  const source = dataset.sources.find(item => item.id === id);
+  const href = safeUrl(source?.url);
+  return href ? `<a class="text-link" href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(source.name)}</a>` : '';
+}
+function teamSeasonXg(fixture) {
+  const teams = [getTeam(fixture.homeId),getTeam(fixture.awayId)].filter(team => Number.isFinite(team?.stats?.xg));
+  if (mode !== 'real' || !teams.length) return '';
+  return `<div class="duel"><h3>xG stagionali di squadra</h3>${teams.map(team => {
+    const stats = team.stats;
+    return `<p>${html(team.shortName)} · ${number(stats.xg,2)} xG${Number.isFinite(stats.xga) ? ` · ${number(stats.xga,2)} xGA` : ''}${Number.isFinite(stats.xgMatches) ? ` · ${number(stats.xgMatches)} partite misurate` : ''}</p>`;
+  }).join('')}<p>Totali dello snapshot stagionale. ${sourceLink(teams[0].stats.xgSource)}</p></div>`;
+}
 function matchCard(fixture) {
   if (!fixture) return empty('Seleziona un incontro.');
   const home = previousForm(fixture.homeId, fixture);
@@ -370,9 +394,10 @@ function matchCard(fixture) {
   const absences = dataset.absences.filter(a => a.fixtureId === fixture.id);
   const statusLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Stato mancante' };
   return `<div class="detail-header"><h2>${html(getTeam(fixture.homeId)?.shortName)} – ${html(getTeam(fixture.awayId)?.shortName)}</h2>${status(score(fixture), fixture.status === 'played' ? 'available' : 'missing')}</div>
-    <p>${html(matchTime(fixture))}</p>
+    <p>${html(matchTime(fixture))}${fixture.resultSourceId ? ` · ${sourceLink(fixture.resultSourceId)}` : ''}</p>
     <div class="duel"><h3>Andamento prima della partita</h3><p>Casa · ${formSummary(home)}</p><p>Trasferta · ${formSummary(away)}</p>
       <p>xG / xGA a partita · casa ${number(home?.xg, 2)} / ${number(home?.xga, 2)} · trasferta ${number(away?.xg, 2)} / ${number(away?.xga, 2)}</p></div>
+    ${teamSeasonXg(fixture)}
     <div class="duel"><h3>Difficoltà per reparto</h3><p>Stima dai risultati precedenti acquisiti, fino a cinque partite per squadra. Il centrocampo usa una media dei due indicatori di squadra.</p></div>
     ${rows.map(([label, role, hint]) => `<div class="duel"><div class="duel-row"><span>${status(opponentLevel(away, role), away ? 'partial' : 'missing')}</span><strong>${label}</strong><span>${status(opponentLevel(home, role), home ? 'partial' : 'missing')}</span></div><p>${hint}</p></div>`).join('')}
     ${odds ? `<div class="duel"><h3>Stima 1X2</h3><div class="probability" aria-hidden="true">${odds.map(value => `<span style="width:${value * 100}%"></span>`).join('')}</div>
@@ -438,7 +463,8 @@ function comparison() {
 }
 function giocatori() {
   const teams = [...dataset.teams].sort((a,b) => a.shortName.localeCompare(b.shortName, 'it'));
-  return `${heading('Calciatori', 'Apri una scheda per vedere numeri stagionali, andamento e motivi dell’indice di schierabilità.')}
+  return `${heading('Calciatori', 'Apri una scheda per vedere numeri stagionali, andamento e motivi dell’indice di schierabilità.',
+      mode === 'real' ? '<button data-market-tab="listone">Apri listone della lega</button>' : '')}
     <section class="panel">
       <div class="filters">
         <input id="player-search" type="search" aria-label="Cerca calciatore" placeholder="Cerca per nome o squadra" value="${html(filters.search)}">
@@ -484,6 +510,9 @@ function showPlayer(id) {
   const a = playerAnalysis(p);
   const games = p.history ?? [];
   const votes = p.ratings ?? [];
+  const ratingValues = votes.map(row => row.rating).filter(Number.isFinite);
+  const fantasyValues = votes.map(row => row.fantasyRating).filter(Number.isFinite);
+  const average = values => values.length ? values.reduce((sum,value) => sum + value,0) / values.length : null;
   const availabilityLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Mancante' };
   const availability = a.availability?.status ?? 'unknown';
   const projected = a.projection;
@@ -506,7 +535,10 @@ function showPlayer(id) {
       ${a.notes.length ? `<ul class="muted">${a.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
     </section>
     ${games.length ? `<section class="dialog-section"><h3>xG e xA per giornata</h3>${historyChart(games, ['xg','xa'], ['xG','xA'], 1, 'Andamento xG e xA')}</section>` : ''}
-    ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>${historyChart(votes, ['rating','fantasyRating'], ['Voto','Fantavoto'], 8, 'Andamento voti FantaTB')}</section>` : ''}
+    ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>
+      <div class="detail-grid">${stat('Voti acquisiti',number(ratingValues.length))}${stat('Media voto acquisita',number(average(ratingValues),2))}
+      ${stat('Fantavoti acquisiti',number(fantasyValues.length))}${stat('Fantamedia acquisita',number(average(fantasyValues),2))}</div>
+      ${historyChart(votes, ['rating','fantasyRating'], ['Voto','Fantavoto'], 8, 'Andamento voti FantaTB')}</section>` : ''}
     ${!games.length && !votes.length ? '<p class="inline-status">Storico individuale mancante.</p>' : ''}
     ${!games.length && votes.length ? '<p class="inline-status">Serie per giornata di xG e xA mancante.</p>' : ''}
     ${Number.isFinite(a.expectedPoints) && a.fixture ? `<section class="dialog-section"><button data-simulate-player="${html(p.id)}">Simula il calciatore</button><div id="individual-simulation" class="dialog-section" aria-live="polite"></div></section>` : ''}`;
@@ -601,7 +633,9 @@ function rosa() {
   const validation = validateLineup(starters, record.formation);
   const reserves = groupPlayers(record.reserves);
   const choices = dataset.players.filter(p => !state.roster.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'it'));
-  const presetButton = mode === 'demo' && dataset.demoPreset ? '<button class="primary" data-load-preset>Carica rosa demo</button>' : '';
+  const presetButton = mode === 'demo' && dataset.demoPreset
+    ? '<button class="primary" data-load-preset>Carica rosa demo</button>'
+    : '<a class="btn" href="#mercato">Apri il mercato</a>';
   return `${heading('La mia rosa', 'Organizza titolari e panchina per giornata. Le modifiche vengono salvate su questo browser.', presetButton)}
   <div class="split">
     <section class="panel"><div class="panel-head"><div><h2>Rosa</h2><p>${roster.length} calciatori selezionati</p></div><a class="text-link" href="#giocatori">Apri il listone →</a></div>
@@ -748,7 +782,9 @@ function fonti() {
   const sources = dataset.sources.map(source => {
     const href = safeUrl(source.url);
     return `<li>${href ? `<a href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(source.name)}</a>` : html(source.name)}
-      ${source.license ? ` · ${html(source.license)}` : ''}${source.updatedAt ? ` · aggiornato ${html(date(source.updatedAt))}` : ''}${source.note ? `<br>${html(source.note)}` : ''}</li>`;
+      ${source.license ? ` · ${html(source.license)}` : ''}${source.updatedAt ? ` · aggiornato ${html(date(source.updatedAt))}` : ''}
+      ${source.latestResultDate ? ` · ultimo risultato ${html(date(source.latestResultDate))}` : ''}
+      ${source.note || source.modifications ? `<br>${html(source.note ?? source.modifications)}` : ''}</li>`;
   });
   return `${heading('Fonti e metodo', 'Controlla la provenienza, la copertura e le ipotesi delle stime.')}
   <div class="split"><section class="panel prose"><h2>Provenienza dei dati</h2>
@@ -763,6 +799,251 @@ function fonti() {
     <h3>xG e xA</h3><p>xG stima la qualità dei tiri. xA stima la qualità delle occasioni create. I valori per 90 minuti si calcolano con minuti positivi e metriche acquisite.</p>
   </section></div>`;
 }
+
+function readMarketSource(kind) {
+  try {
+    const source = JSON.parse(localStorage.getItem(MARKET_KEY + kind) ?? 'null');
+    return source?.version === 1 && Array.isArray(source.rows) && source.rows.length <= 10000
+      && source.rows.every(row => typeof row?.id === 'string' && typeof row.name === 'string')
+      ? source : null;
+  } catch { return null; }
+}
+function saveMarketSource(kind, source) {
+  marketImports[kind] = source;
+  marketCache = undefined;
+  try {
+    if (source) localStorage.setItem(MARKET_KEY + kind, JSON.stringify(source));
+    else localStorage.removeItem(MARKET_KEY + kind);
+    return true;
+  } catch { return false; }
+}
+function getMarket() {
+  const roster = modeState().roster;
+  const rosterKey = roster.join('\0');
+  if (marketCache?.dataset === dataset && marketCache.round === round && marketCache.rosterKey === rosterKey) {
+    return marketCache.result;
+  }
+  const result = buildMarket({
+    listone: marketImports.listone?.rows ?? [],
+    freeAgents: marketImports.svincolati?.rows ?? [],
+    roster: groupPlayers(roster),
+    dataset, round,
+    analyze: player => playerAnalysis(player)
+  });
+  marketCache = { dataset, round, rosterKey, result };
+  return result;
+}
+function marketImportCard(kind) {
+  const source = marketImports[kind];
+  const count = source?.rows.length;
+  const outside = source?.rows.filter(row => row.offList).length ?? 0;
+  const label = MARKET_UPLOADS[kind];
+  return `<section class="panel market-file"><div class="panel-head"><h2>${label}</h2>${source
+      ? status(`${number(count)} righe`, 'available')
+      : status('Da caricare', 'missing')}</div>
+    <p>${source
+      ? `Caricato il ${html(date(source.importedAt))} · ${number(outside)} fuori lista${source.skipped ? ` · ${number(source.skipped)} righe saltate` : ''}`
+      : kind === 'listone' ? 'Usa l’Excel dei calciatori della lega per consultare ruoli, voti e assegnazioni.' : 'Usa l’Excel degli svincolati della tua lega per trovare i giocatori disponibili.'}</p>
+    <div class="file-actions"><label class="btn button-file">${source ? 'Sostituisci' : 'Carica Excel'}<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-market-file="${kind}" aria-label="Carica ${label}"></label>
+    ${source ? `<button data-market-clear="${kind}" aria-label="Rimuovi ${label}">Rimuovi</button>` : ''}</div></section>`;
+}
+const MARKET_TABS = { riparazione: 'Riparazione', scambi: 'Scambi', listone: 'Listone della lega' };
+const MARKET_AVAILABILITY = {
+  free: ['Svincolato','available'], owned: ['Assegnato','partial'], unconfirmed: ['Da verificare','missing'],
+  'off-list': ['Fuori lista','missing'], conflict: ['File discordanti','partial']
+};
+const MARKET_SIGNALS = {
+  upgrade: ['Miglioramento','available'], downgrade: ['Peggioramento','partial'], similar: ['Valori simili','missing'],
+  limited: ['Campione ridotto','partial'], insufficient: ['Dati insufficienti','missing']
+};
+function marketClub(profile) { return getTeam(profile.teamId)?.shortName ?? profile.team ?? '—'; }
+function marketProfileText(profile) {
+  return `${html(profile.name)} · ${html(marketClub(profile))} · ${SHORT[profile.position] ?? '—'}`;
+}
+function creditInput(value) {
+  const n = value === '' ? null : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function marketOutgoing(market) {
+  return market.roster.find(player => player.key === marketFilters.outgoing
+    && (!marketFilters.role || player.position === marketFilters.role));
+}
+function marketToolbar(market) {
+  const outgoing = marketOutgoing(market);
+  const catalog = marketFilters.tab === 'listone';
+  const repair = marketFilters.tab === 'riparazione';
+  const choices = market.roster.filter(p => !marketFilters.role || p.position === marketFilters.role);
+  return `<div class="filters market-filters">
+    ${catalog ? '' : `<label class="field-label">Giocatore in uscita<select id="market-outgoing">
+      <option value="">${repair ? 'Tutta la rosa' : 'Scegli dalla rosa'}</option>
+      ${choices.map(p => `<option value="${html(p.key)}" ${outgoing?.key === p.key ? 'selected' : ''}>${marketProfileText(p)}</option>`).join('')}</select></label>`}
+    <label class="field-label">Ruolo<select id="market-role"><option value="">Tutti i ruoli</option>${Object.entries(ROLES).map(([id, name]) =>
+      `<option value="${id}" ${marketFilters.role === id ? 'selected' : ''}>${name}</option>`).join('')}</select></label>
+    <label class="field-label market-query">Cerca<input type="search" id="market-search" placeholder="Nome, club o squadra fantasy" value="${html(marketFilters.search)}"></label>
+    ${repair ? `<label class="field-label">Quotazione massima<input type="number" id="market-budget" min="0" max="99999" step="1" placeholder="Qualsiasi" value="${html(marketFilters.budget)}"></label>` : ''}
+    ${marketFilters.tab === 'scambi' ? `<label class="field-label">Conguaglio in crediti<input type="number" id="market-credits" min="-99999" max="99999" step="1" placeholder="Facoltativo" value="${html(marketFilters.credits)}"></label>` : ''}
+  </div>`;
+}
+function marketMatch(p) {
+  return (!marketFilters.role || p.position === marketFilters.role)
+    && (!marketFilters.search || normalized(`${p.name} ${marketClub(p)} ${p.team ?? ''} ${p.owner ?? ''}`).includes(normalized(marketFilters.search)));
+}
+function marketDelta(value, digits = 0) {
+  return Number.isFinite(value) && value > 0 ? `+${number(value,digits)}` : number(value,digits);
+}
+function marketCard(result, trade = false) {
+  if (!result) return '';
+  if (!result.ok) return `<p class="notice neutral">${html(result.reason ?? 'Confronto non disponibile.')}</p>`;
+  const { outgoing, incoming, delta, signal } = result;
+  const [label, tone] = MARKET_SIGNALS[signal] ?? MARKET_SIGNALS.insufficient;
+  const credit = result.creditDifference;
+  return `<article class="market-comparison">
+    <div class="panel-head"><h3><span class="muted">${html(outgoing.name)}</span> <span aria-label="in cambio di">→</span> ${html(incoming.name)}</h3>${status(label, tone)}</div>
+    <div class="market-facts"><span>Indice ${marketDelta(delta.score)} pt</span><span>FM corretta ${marketDelta(delta.adjustedFantasy,2)}</span><span>Partite a voto ${marketDelta(delta.appearances)}</span>${Number.isFinite(delta.expectedPoints) ? `<span>Fantapunti attesi ${marketDelta(delta.expectedPoints,2)}</span>` : ''}</div>
+    <p>${html(ROLES[incoming.position] ?? 'Ruolo mancante')} · ${html(marketClub(incoming))} · FM ${number(incoming.fantasyAverage,2)} su ${number(incoming.appearances)} voti · quotazione ${number(incoming.price)}</p>
+    ${trade && Number.isFinite(credit) ? `<p>Conguaglio indicato · ${credit === 0 ? 'nessuno' : `${number(Math.abs(credit))} crediti ${credit > 0 ? 'a tuo carico' : 'in entrata'}`}</p>` : ''}
+    <details><summary>Come si confrontano</summary><div class="table-wrap"><table>
+      <thead><tr><th>Indicatore</th><th class="numeric">In uscita</th><th class="numeric">In entrata</th></tr></thead>
+      <tbody>
+        ${[['Indice',outgoing.score,incoming.score,0],['Media voto',outgoing.averageRating,incoming.averageRating,2],
+          ['FM su partite a voto',outgoing.fantasyAverage,incoming.fantasyAverage,2],
+          ['FM corretta per campione',outgoing.adjustedFantasy,incoming.adjustedFantasy,2],
+          ['Partite a voto',outgoing.appearances,incoming.appearances,0],['Quotazione',outgoing.price,incoming.price,0],
+          ['Costo storico',outgoing.cost,incoming.cost,0]]
+          .map(([name,before,after,digits]) => `<tr><th scope="row">${name}</th><td class="numeric">${number(before,digits)}</td><td class="numeric">${number(after,digits)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p>${html(result.reason ?? '')}</p>
+    </details>
+  </article>`;
+}
+function marketList(profiles, comparisons, trade) {
+  const pages = Math.max(1, Math.ceil(profiles.length / PER_PAGE));
+  marketFilters.page = Math.max(1, Math.min(pages, marketFilters.page));
+  const items = profiles.slice((marketFilters.page - 1) * PER_PAGE, marketFilters.page * PER_PAGE);
+  if (!items.length) return empty('Nessun calciatore corrisponde a questi filtri.');
+  return `<div class="table-wrap" tabindex="0" role="region" aria-label="Risultati di mercato">
+    <table><thead><tr><th>Calciatore</th><th>Club</th><th>Ruolo</th><th>Disponibilità</th><th>Squadra fantasy</th>
+      <th class="numeric" title="Partite con voto">PGv</th><th class="numeric" title="Fantamedia nell’Excel">FM</th>
+      <th class="numeric">FM corretta</th><th class="numeric">Quot.</th><th class="numeric">FVM/1000</th>
+      <th class="numeric">Indice</th>${comparisons ? '<th class="numeric">Δ indice</th>' : ''}${trade ? '<th>Scambio</th>' : ''}</tr></thead><tbody>
+    ${items.map(p => {
+      const [label,tone] = MARKET_AVAILABILITY[p.availability] ?? MARKET_AVAILABILITY.unconfirmed;
+      const datasetPlayer = p.datasetId ? getPlayer(p.datasetId) : null;
+      return `<tr><td>${datasetPlayer ? `<button class="player-name" data-player="${html(p.datasetId)}">${html(p.name)}</button>` : html(p.name)}</td>
+        <td>${html(marketClub(p))}</td><td>${SHORT[p.position] ?? '—'}</td><td>${status(label,tone)}</td><td>${html(p.owner ?? '—')}</td>
+        <td class="numeric">${number(p.appearances)}</td><td class="numeric">${number(p.fantasyAverage,2)}</td>
+        <td class="numeric">${number(p.adjustedFantasy,2)}</td><td class="numeric">${number(p.price)}</td><td class="numeric">${number(p.fvm)}</td>
+        <td class="numeric">${number(p.score)}</td>${comparisons ? `<td class="numeric">${marketDelta(comparisons.get(p.key)?.delta.score)}</td>` : ''}
+        ${trade ? `<td><button data-market-incoming="${html(p.key)}" aria-label="Confronta ${html(p.name)}" aria-pressed="${p.key === marketFilters.incoming}">Confronta</button></td>` : ''}</tr>`;
+    }).join('')}</tbody></table></div>
+    <div class="paging"><button data-market-page="-1" ${marketFilters.page === 1 ? 'disabled' : ''}>← Precedente</button>
+    <span aria-live="polite">Pagina ${marketFilters.page} / ${pages} · ${number(profiles.length)} calciatori</span>
+    <button data-market-page="1" ${marketFilters.page === pages ? 'disabled' : ''}>Successiva →</button></div>`;
+}
+function marketResults(market) {
+  const tab = marketFilters.tab;
+  const outgoing = marketOutgoing(market);
+  const budget = creditInput(marketFilters.budget);
+  const withinBudget = p => budget == null || Number.isFinite(p.price) && p.price <= budget;
+  const sortByScore = (a,b) => (b.score ?? -Infinity) - (a.score ?? -Infinity) || a.name.localeCompare(b.name,'it');
+  if (tab === 'listone') {
+    if (!marketImports.listone) return empty('Carica il listone completo per consultare i calciatori della lega.');
+    const complete = market.catalog.filter(p => p.source === 'listone' && marketMatch(p)).sort((a,b) => a.name.localeCompare(b.name,'it'));
+    return marketList(complete, null, false);
+  }
+  const rosterHint = market.roster.length ? '' : '<p class="inline-status">Importa la tua rosa per vedere possibili sostituzioni. <a class="text-link" href="#rosa">Vai alla rosa →</a></p>';
+  if (tab === 'scambi') {
+    if (!marketImports.listone) return empty('Carica il listone completo per vedere i calciatori assegnati alle altre squadre fantasy.');
+    const ownPlayers = new Set(market.roster.map(p => p.playerKey).filter(Boolean));
+    const owners = new Set(market.roster.map(p => p.owner).filter(Boolean));
+    const assigned = market.catalog.filter(p => p.availability === 'owned' && !ownPlayers.has(p.key)
+      && !(owners.size === 1 && owners.has(p.owner)) && (!outgoing || p.position === outgoing.position) && marketMatch(p))
+      .sort(sortByScore);
+    const ranked = outgoing ? assigned.map(p => compareMarketTrade(market, outgoing.key, p.key)).filter(result => result.ok) : [];
+    const comparisons = outgoing ? new Map(ranked.map(result => [result.incoming.key,result])) : null;
+    const suggestions = ranked.filter(result => result.signal === 'upgrade').slice(0,3);
+    const comparison = outgoing && marketFilters.incoming
+      ? compareMarketTrade(market, outgoing.key, marketFilters.incoming, { creditDifference: creditInput(marketFilters.credits) }) : null;
+    return `${rosterHint}${outgoing ? '' : '<p class="inline-status">Seleziona un giocatore in uscita per confrontare uno scambio a parità di ruolo.</p>'}
+      ${comparison ? marketCard(comparison,true) : suggestions.length ? `<div class="market-suggestions"><h3>Scambi da valutare</h3>
+        ${suggestions.map(result => marketCard(result,true)).join('')}</div>` : ''}
+      ${marketList(assigned,comparisons,Boolean(outgoing))}`;
+  }
+  if (!marketImports.svincolati) return empty('Carica l’elenco degli svincolati per restringere i suggerimenti alla tua lega.');
+  const eligible = market.freeAgents.filter(p => withinBudget(p) && marketMatch(p)).sort(sortByScore);
+  const rank = key => rankMarketReplacements(market, key, { maxReferencePrice: budget, limit: market.freeAgents.length }).candidates;
+  const ranked = outgoing ? rank(outgoing.key).filter(c => marketMatch(c.incoming)) : [];
+  const candidates = outgoing ? ranked.map(c => c.incoming) : eligible;
+  const comparisons = outgoing ? new Map(ranked.map(c => [c.incoming.key,c])) : null;
+  const suggestions = outgoing
+    ? ranked.filter(c => c.signal === 'upgrade').slice(0,3)
+    : market.roster.filter(p => !marketFilters.role || p.position === marketFilters.role)
+      .flatMap(p => rank(p.key).filter(c => c.signal === 'upgrade' && marketMatch(c.incoming)).slice(0,1))
+      .sort((a,b) => b.delta.score - a.delta.score)
+      .filter((item,index,all) => all.findIndex(other => other.incoming.key === item.incoming.key) === index).slice(0,5);
+  const offList = market.roster.filter(p => p.offList && (!marketFilters.role || p.position === marketFilters.role));
+  return `${rosterHint}
+    ${offList.length ? `<p class="notice neutral"><strong>Fuori lista nella tua rosa</strong> ${offList.map(p => html(p.name)).join(', ')}.</p>` : ''}
+    ${suggestions.length ? `<div class="market-suggestions"><h3>Migliori sostituzioni</h3><p class="muted">Ogni proposta è un confronto indipendente a parità di ruolo.</p>
+      ${suggestions.map(result => marketCard(result)).join('')}</div>`
+      : market.roster.length ? '<p class="inline-status">Nessun miglioramento con evidenza sufficiente per i filtri selezionati.</p>' : ''}
+    ${marketList(candidates,comparisons,false)}`;
+}
+function mercato() {
+  if (mode === 'demo') return `${heading('Mercato', 'Analizza gli svincolati e gli scambi della tua lega.')}
+    <section class="panel"><p>Gli Excel della lega si caricano in modalità Dati reali.</p><button data-mode="real">Passa ai dati reali</button></section>`;
+  const market = getMarket();
+  const coverage = market.coverage;
+  return `${heading('Mercato', 'Cerca possibili miglioramenti tra gli svincolati e confronta gli scambi per ruolo.')}
+    <div class="market-inputs">${Object.keys(MARKET_UPLOADS).map(marketImportCard).join('')}</div>
+    <p class="inline-status">Gli Excel e le assegnazioni restano su questo browser. Il listone della lega è disponibile in questa sezione.</p>
+    ${coverage.catalog ? `<div class="market-facts market-coverage" aria-label="Copertura analisi">
+      ${coverage.roster ? `<span>Rosa collegata ${number(coverage.matchedRoster)}/${number(coverage.roster)}</span>` : ''}
+      ${marketImports.svincolati ? `<span>${number(coverage.eligibleFreeAgents)} svincolati candidabili</span><span>${number(coverage.unscoredFreeAgents)} senza indice</span>` : ''}
+      ${coverage.conflictingFreeAgents ? `<span>${number(coverage.conflictingFreeAgents)} righe discordanti escluse</span>` : ''}
+    </div>` : ''}
+    ${marketNotice ? `<p class="notice neutral" role="status">${html(marketNotice)}</p>` : ''}
+    <section class="panel market-workbench">
+      <div class="panel-head"><div><h2>${MARKET_TABS[marketFilters.tab]}</h2><p>${marketFilters.tab === 'riparazione'
+        ? 'Il filtro usa la quotazione di riferimento. Il prezzo effettivo dipende dalla tua asta.'
+        : marketFilters.tab === 'scambi' ? 'Un confronto alla volta tra giocatori dello stesso ruolo. Conguaglio positivo se paghi, negativo se incassi.'
+        : 'Cerca tra tutti i giocatori dell’Excel, compresi quelli fuori lista.'}</p></div></div>
+      <div class="mode-switch market-tabs" role="group" aria-label="Sezione mercato">${Object.entries(MARKET_TABS).map(([id,label]) =>
+        `<button type="button" data-market-tab="${id}" aria-pressed="${id === marketFilters.tab}">${label}</button>`).join('')}</div>
+      ${marketToolbar(market)}
+      <div id="market-results">${marketResults(market)}</div>
+      <details class="market-method"><summary>Fonti e metodo dell’indice</summary>
+        <p>Il confronto usa fantamedia e partite a voto dell’Excel. La fantamedia corretta si avvicina al valore tipico del ruolo quando il campione è piccolo. Quotazioni e FVM sono riferimenti del file. Il trattino indica un dato mancante.</p>
+        ${market.notes.length ? `<ul>${market.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
+      </details>
+    </section>`;
+}
+function refreshMarket() {
+  const results = $('#market-results');
+  if (results) results.innerHTML = marketResults(getMarket());
+}
+async function importMarketFile(kind, file) {
+  if (!Object.hasOwn(MARKET_UPLOADS,kind) || mode !== 'real') return;
+  const version = ++marketReadVersion[kind];
+  try {
+    if (file.size > 12 * 1024 * 1024) throw new Error('Il file supera 12 MB.');
+    const parsed = await readMarketWorkbook(await file.arrayBuffer());
+    if (version !== marketReadVersion[kind]) return;
+    const sheet = normalized(parsed.sheet);
+    if ((kind === 'listone' && sheet === 'svincolati') || (kind === 'svincolati' && sheet === 'lista calciatori')) {
+      throw new Error('Questo Excel appartiene all’altro campo di caricamento.');
+    }
+    const saved = saveMarketSource(kind, { version: 1, ...parsed, importedAt: new Date().toISOString() });
+    marketFilters.page = 1;
+    marketFilters.incoming = '';
+    marketNotice = `${MARKET_UPLOADS[kind]} · ${number(parsed.rows.length)} righe caricate.${saved ? '' : ' Il salvataggio locale non è disponibile.'}`;
+  } catch (error) {
+    if (version !== marketReadVersion[kind]) return;
+    marketNotice = `${MARKET_UPLOADS[kind]} · ${error.message}`;
+  }
+  if (page === 'mercato' && mode === 'real') render();
+}
+
 function refreshPlayers() {
   const list = $('#player-list');
   if (list) list.innerHTML = playerList();
@@ -781,6 +1062,13 @@ function wireEvents() {
   window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
     if (Object.hasOwn(PAGES, hash) || !hash) setPage(currentPage());
+  });
+  window.addEventListener('storage', event => {
+    const kind = event.key?.startsWith(MARKET_KEY) ? event.key.slice(MARKET_KEY.length) : null;
+    if (!Object.hasOwn(MARKET_UPLOADS,kind)) return;
+    marketImports[kind] = readMarketSource(kind);
+    marketCache = undefined;
+    if (page === 'mercato' && mode === 'real') render();
   });
   dialog.addEventListener('close', () => lastFocus?.isConnected && lastFocus.focus());
   document.addEventListener('click', event => {
@@ -802,6 +1090,30 @@ function wireEvents() {
       } else location.hash = 'match';
     }
     if (data.round) goRound(Number(data.round));
+    if (Object.hasOwn(MARKET_TABS,data.marketTab)) {
+      Object.assign(marketFilters, { tab:data.marketTab, search:'', role:'', outgoing:'', incoming:'', page:1 });
+      if (page === 'mercato') {
+        render();
+        $('#view .market-tabs [aria-pressed="true"]')?.focus({preventScroll:true});
+      } else location.hash = 'mercato';
+    }
+    if (Object.hasOwn(MARKET_UPLOADS,data.marketClear)) {
+      marketReadVersion[data.marketClear]++;
+      const removed = saveMarketSource(data.marketClear, null);
+      marketNotice = removed ? 'Elenco rimosso dal browser.' : 'Il browser non ha confermato la rimozione dal salvataggio locale.';
+      marketFilters.incoming = '';
+      render();
+    }
+    if (data.marketPage) {
+      marketFilters.page += Number(data.marketPage);
+      refreshMarket();
+      $('#market-results .paging button:not(:disabled)')?.focus({preventScroll:true});
+    }
+    if (data.marketIncoming) {
+      marketFilters.incoming = data.marketIncoming;
+      refreshMarket();
+      $('#market-results .market-comparison')?.scrollIntoView({block:'nearest'});
+    }
     if (data.club) { filters.team = data.club; filters.search = ''; filters.position = ''; filters.page = 1; location.hash = 'giocatori'; }
     if (data.player) showPlayer(data.player);
     if (data.simulatePlayer) {
@@ -827,10 +1139,31 @@ function wireEvents() {
   });
   document.addEventListener('input', event => {
     if (event.target.id === 'player-search') { filters.search = event.target.value; filters.page = 1; refreshPlayers(); }
+    if (event.target.id === 'market-search') {
+      marketFilters.search = event.target.value;
+      marketFilters.page = 1;
+      refreshMarket();
+    }
   });
   document.addEventListener('change', async event => {
     if (!dataset) return;
     const { id, value } = event.target;
+    if (event.target.dataset.marketFile) {
+      const file = event.target.files?.[0];
+      if (file) await importMarketFile(event.target.dataset.marketFile, file);
+      return;
+    }
+    const marketFilter = {'market-role':'role','market-outgoing':'outgoing','market-budget':'budget','market-credits':'credits'}[id];
+    if (marketFilter) {
+      marketFilters[marketFilter] = value;
+      if (marketFilter !== 'credits') marketFilters.page = 1;
+      if (marketFilter === 'role' || marketFilter === 'outgoing') marketFilters.incoming = '';
+      if (marketFilter === 'role') {
+        if (!marketOutgoing(getMarket())) marketFilters.outgoing = '';
+        render();
+        $('#market-role')?.focus({preventScroll:true});
+      } else refreshMarket();
+    }
     if (id === 'round') goRound(Number(value));
     const filter = { 'player-position': 'position', 'player-team': 'team', 'player-sort': 'sort' }[id];
     if (filter) { filters[filter] = value; filters.page = 1; refreshPlayers(); }

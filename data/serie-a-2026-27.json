@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "season": "2026/27",
   "mode": "real",
-  "updatedAt": "2026-11-11T18:09:40+00:00",
+  "updatedAt": "2026-11-12T21:36:24+00:00",
   "sources": [
     {
       "id": "openfootball",
@@ -10,9 +10,76 @@
       "url": "https://raw.githubusercontent.com/openfootball/football.json/master/2026-27/it.1.json",
       "license": "CC0-1.0",
       "licenseUrl": "https://github.com/openfootball/football.json/blob/master/LICENSE.md",
-      "retrievedAt": "2026-11-11T18:09:40+00:00",
+      "retrievedAt": "2026-11-12T21:36:24+00:00",
       "contentSha256": "721a6c220fecb8208287e41401fa2fce652cd23765ce58a39bf98cdaa3d528ad",
       "latestResultDate": "2026-09-20"
+    },
+    {
+      "id": "footballanalytics",
+      "name": "Football Analytics",
+      "url": "https://footballanalytics.pro/en/data",
+      "dataUrl": "https://footballanalytics.pro/data/serie-a.json",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "retrievedAt": "2026-11-12T21:36:24+00:00",
+      "generatedAt": "2026-11-12T21:27:58+00:00",
+      "contentSha256": "2af50a208649af16d542fb15221ea345b20642ef43cd7a74a8ccb029964c0841",
+      "latestResultDate": "2026-11-08",
+      "settledRows": 98,
+      "matchedOtherSources": 44,
+      "addedResults": 54,
+      "conflictingResults": 0,
+      "unmatchedResults": 0,
+      "modifications": "Solo risultati finali e orari mancanti. Unione con il calendario per squadre e data italiana."
+    },
+    {
+      "id": "verified-club-results",
+      "name": "Riscontri dai club",
+      "url": "https://github.com/cramberri1/fantalab-pro-2026-27/blob/main/docs/FONTI.md",
+      "verifiedDate": "2026-11-12",
+      "latestResultDate": "2026-10-19",
+      "addedResults": 6,
+      "matchedOtherSources": 0,
+      "conflictingResults": 0,
+      "references": [
+        {
+          "fixtureId": "napoli-frosinone",
+          "date": "2026-10-10",
+          "url": "https://sscnapoli.it/en/match-report-napoli-frosinone-3-0/",
+          "confirmationUrl": "https://www.frosinonecalcio.com/conferenza-stampa-post-partita-giacomo-calo/"
+        },
+        {
+          "fixtureId": "lazio-monza",
+          "date": "2026-10-11",
+          "url": "https://www.sslazio.it/it/news/match-report/serie-a-enilive-or-lazio-monza-le-formazioni-ufficiali-a",
+          "confirmationUrl": "https://www.acmonza.com/it/news/lazio-monza-report-11102026/"
+        },
+        {
+          "fixtureId": "atalanta-venezia",
+          "date": "2026-10-12",
+          "url": "https://www.veneziafc.it/news/il-post-partita-di-atalanta-venezia",
+          "confirmationUrl": "https://www.atalanta.it/partite-e-risultati/prima-squadra/index"
+        },
+        {
+          "fixtureId": "frosinone-sassuolo",
+          "date": "2026-10-16",
+          "url": "https://www.frosinonecalcio.com/frosinone-sassuolo-4-2/",
+          "confirmationUrl": "https://www.sassuolocalcio.it/sassuolo-channel-tv/serie-a-enilive-gli-highlights-di-frosinone-sassuolo-4-2/"
+        },
+        {
+          "fixtureId": "venezia-napoli",
+          "date": "2026-10-17",
+          "url": "https://www.veneziafc.it/news/il-post-partita-di-venezia-napoli",
+          "confirmationUrl": "https://sscnapoli.it/match-report-venezia-napoli-1-0/"
+        },
+        {
+          "fixtureId": "monza-cagliari",
+          "date": "2026-10-19",
+          "url": "https://www.acmonza.com/it/news/monza-cagliari-report-19102026/",
+          "confirmationUrl": "https://cagliaricalcio.com/news/match-report-monza-cagliari-4-0/"
+        }
+      ],
+      "modifications": "Singoli risultati verificati sui resoconti pubblici di entrambi i club. Controllo manuale."
     },
     {
       "id": "transferbeat",
@@ -22,7 +89,7 @@
       "license": "CC-BY-4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
       "updatedAt": "2026-10-01T12:27:57Z",
-      "retrievedAt": "2026-11-11T18:09:40+00:00",
+      "retrievedAt": "2026-11-12T21:36:24+00:00",
       "contentSha256": "dbfaa54119526a637822c688bd48dc365aab5e9de1adfc8c62a895d4076c368b",
       "modifications": "Squadre e ruoli Classic normalizzati. Quotazioni editoriali FantaTB in crediti."
     },
@@ -33,7 +100,7 @@
       "license": "CC-BY-4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
       "updatedAt": "2026-10-02T00:58:34Z",
-      "retrievedAt": "2026-11-11T18:09:40+00:00",
+      "retrievedAt": "2026-11-12T21:36:24+00:00",
       "rounds": [
         1,
         2,
@@ -78,18 +145,31 @@
       "ambiguousRatings": 0,
       "ratingsCount": 1416,
       "modifications": "Voti e fantavoti FantaTB definitivi associati al listone. Esclusi i dati grezzi e i voti provvisori."
+    },
+    {
+      "id": "calcioit-team-xg",
+      "name": "calcio.it",
+      "url": "https://calcio.it/serie-a/tendenze",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "capturedOn": "2026-11-12",
+      "fixturesWithXg": 110,
+      "teamsWithXg": 20,
+      "seedSha256": "baad4d0d2c5cf2c9986479c53f38282ab80d09d598ad2453aca1f3f6727cfa72",
+      "modifications": "Totali xG fatti trascritti dalla tabella aperta, con squadre e decimali normalizzati. Il campione può essere diverso da quello dei risultati."
     }
   ],
   "coverage": {
     "fixtures": "available",
-    "results": "partial",
+    "results": "available",
     "players": "available",
     "expectedGoals": "missing",
     "expectedAssists": "missing",
     "absences": "missing",
-    "teamStats": "partial",
+    "teamStats": "available",
     "playerStats": "missing",
-    "ratings": "partial"
+    "ratings": "partial",
+    "teamExpectedGoals": "available"
   },
   "teams": [
     {
@@ -97,11 +177,13 @@
       "name": "Atalanta BC",
       "shortName": "Atalanta",
       "stats": {
-        "matches": 5,
-        "goalsFor": 5,
-        "goalsAgainst": 7,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 17,
+        "goalsAgainst": 20,
+        "xg": 17.22,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -109,11 +191,13 @@
       "name": "Bologna FC 1909",
       "shortName": "Bologna",
       "stats": {
-        "matches": 5,
-        "goalsFor": 3,
-        "goalsAgainst": 6,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 16,
+        "goalsAgainst": 14,
+        "xg": 17.38,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -121,11 +205,13 @@
       "name": "Cagliari Calcio",
       "shortName": "Cagliari",
       "stats": {
-        "matches": 5,
-        "goalsFor": 5,
-        "goalsAgainst": 2,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 10,
+        "goalsAgainst": 15,
+        "xg": 12.91,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -133,11 +219,13 @@
       "name": "Como 1907",
       "shortName": "Como",
       "stats": {
-        "matches": 5,
-        "goalsFor": 9,
-        "goalsAgainst": 6,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 18,
+        "goalsAgainst": 10,
+        "xg": 18.52,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -145,11 +233,13 @@
       "name": "ACF Fiorentina",
       "shortName": "Fiorentina",
       "stats": {
-        "matches": 5,
-        "goalsFor": 6,
-        "goalsAgainst": 12,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 17,
+        "goalsAgainst": 25,
+        "xg": 18.34,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -157,11 +247,13 @@
       "name": "Frosinone Calcio",
       "shortName": "Frosinone",
       "stats": {
-        "matches": 5,
-        "goalsFor": 9,
-        "goalsAgainst": 4,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 24,
+        "goalsAgainst": 15,
+        "xg": 19.61,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -169,11 +261,13 @@
       "name": "Genoa CFC",
       "shortName": "Genoa",
       "stats": {
-        "matches": 5,
-        "goalsFor": 3,
-        "goalsAgainst": 10,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 11,
+        "goalsAgainst": 16,
+        "xg": 10.35,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -181,11 +275,13 @@
       "name": "FC Internazionale Milano",
       "shortName": "Inter",
       "stats": {
-        "matches": 5,
-        "goalsFor": 15,
-        "goalsAgainst": 8,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 28,
+        "goalsAgainst": 13,
+        "xg": 28.61,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -193,11 +289,13 @@
       "name": "Juventus FC",
       "shortName": "Juventus",
       "stats": {
-        "matches": 5,
-        "goalsFor": 8,
-        "goalsAgainst": 4,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 15,
+        "goalsAgainst": 12,
+        "xg": 16.23,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -205,11 +303,13 @@
       "name": "SS Lazio",
       "shortName": "Lazio",
       "stats": {
-        "matches": 5,
-        "goalsFor": 8,
-        "goalsAgainst": 3,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 25,
+        "goalsAgainst": 9,
+        "xg": 17.05,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -217,11 +317,13 @@
       "name": "US Lecce",
       "shortName": "Lecce",
       "stats": {
-        "matches": 5,
-        "goalsFor": 5,
-        "goalsAgainst": 10,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 12,
+        "goalsAgainst": 22,
+        "xg": 13.75,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -229,11 +331,13 @@
       "name": "AC Milan",
       "shortName": "Milan",
       "stats": {
-        "matches": 5,
-        "goalsFor": 10,
-        "goalsAgainst": 4,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 23,
+        "goalsAgainst": 13,
+        "xg": 17.68,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -241,11 +345,13 @@
       "name": "AC Monza",
       "shortName": "Monza",
       "stats": {
-        "matches": 5,
-        "goalsFor": 8,
-        "goalsAgainst": 12,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 17,
+        "goalsAgainst": 25,
+        "xg": 17.61,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -253,11 +359,13 @@
       "name": "SSC Napoli",
       "shortName": "Napoli",
       "stats": {
-        "matches": 5,
-        "goalsFor": 7,
-        "goalsAgainst": 6,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 18,
+        "goalsAgainst": 14,
+        "xg": 19.73,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -265,11 +373,13 @@
       "name": "Parma Calcio 1913",
       "shortName": "Parma",
       "stats": {
-        "matches": 5,
-        "goalsFor": 4,
-        "goalsAgainst": 7,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 9,
+        "goalsAgainst": 17,
+        "xg": 8.92,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -277,11 +387,13 @@
       "name": "AS Roma",
       "shortName": "Roma",
       "stats": {
-        "matches": 5,
-        "goalsFor": 14,
-        "goalsAgainst": 3,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 31,
+        "goalsAgainst": 10,
+        "xg": 26.81,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -289,11 +401,13 @@
       "name": "US Sassuolo Calcio",
       "shortName": "Sassuolo",
       "stats": {
-        "matches": 5,
-        "goalsFor": 9,
-        "goalsAgainst": 9,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 16,
+        "goalsAgainst": 29,
+        "xg": 14.16,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -301,11 +415,13 @@
       "name": "Torino FC",
       "shortName": "Torino",
       "stats": {
-        "matches": 5,
-        "goalsFor": 5,
-        "goalsAgainst": 8,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 15,
+        "goalsAgainst": 17,
+        "xg": 12.61,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -313,11 +429,13 @@
       "name": "Udinese Calcio",
       "shortName": "Udinese",
       "stats": {
-        "matches": 5,
-        "goalsFor": 8,
-        "goalsAgainst": 11,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 12,
+        "goalsAgainst": 25,
+        "xg": 13.11,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     },
     {
@@ -325,11 +443,13 @@
       "name": "Venezia FC",
       "shortName": "Venezia",
       "stats": {
-        "matches": 5,
-        "goalsFor": 4,
-        "goalsAgainst": 13,
-        "xg": null,
-        "xga": null
+        "matches": 11,
+        "goalsFor": 8,
+        "goalsAgainst": 21,
+        "xg": 15.99,
+        "xga": null,
+        "xgMatches": 11,
+        "xgSource": "calcioit-team-xg"
       }
     }
   ],
@@ -991,11 +1111,12 @@
       "kickoff": "2026-10-10T15:00:00+02:00",
       "homeId": "genoa",
       "awayId": "fiorentina",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "inter-parma",
@@ -1004,11 +1125,12 @@
       "kickoff": "2026-10-10T18:00:00+02:00",
       "homeId": "inter",
       "awayId": "parma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "napoli-frosinone",
@@ -1017,11 +1139,13 @@
       "kickoff": "2026-10-10T20:45:00+02:00",
       "homeId": "napoli",
       "awayId": "frosinone",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://sscnapoli.it/en/match-report-napoli-frosinone-3-0/"
     },
     {
       "id": "como-roma",
@@ -1030,11 +1154,12 @@
       "kickoff": "2026-10-11T12:30:00+02:00",
       "homeId": "como",
       "awayId": "roma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "lazio-monza",
@@ -1043,11 +1168,13 @@
       "kickoff": "2026-10-11T15:00:00+02:00",
       "homeId": "lazio",
       "awayId": "monza",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://www.sslazio.it/it/news/match-report/serie-a-enilive-or-lazio-monza-le-formazioni-ufficiali-a"
     },
     {
       "id": "lecce-bologna",
@@ -1056,11 +1183,12 @@
       "kickoff": "2026-10-11T15:00:00+02:00",
       "homeId": "lecce",
       "awayId": "bologna",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "sassuolo-milan",
@@ -1069,11 +1197,12 @@
       "kickoff": "2026-10-11T18:00:00+02:00",
       "homeId": "sassuolo",
       "awayId": "milan",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "cagliari-juventus",
@@ -1082,11 +1211,12 @@
       "kickoff": "2026-10-11T20:45:00+02:00",
       "homeId": "cagliari",
       "awayId": "juventus",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "atalanta-venezia",
@@ -1095,11 +1225,13 @@
       "kickoff": "2026-10-12T18:30:00+02:00",
       "homeId": "atalanta",
       "awayId": "venezia",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://www.veneziafc.it/news/il-post-partita-di-atalanta-venezia"
     },
     {
       "id": "torino-udinese",
@@ -1108,11 +1240,12 @@
       "kickoff": "2026-10-12T20:45:00+02:00",
       "homeId": "torino",
       "awayId": "udinese",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "frosinone-sassuolo",
@@ -1121,11 +1254,13 @@
       "kickoff": "2026-10-16T20:45:00+02:00",
       "homeId": "frosinone",
       "awayId": "sassuolo",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 4,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://www.frosinonecalcio.com/frosinone-sassuolo-4-2/"
     },
     {
       "id": "venezia-napoli",
@@ -1134,11 +1269,13 @@
       "kickoff": "2026-10-17T15:00:00+02:00",
       "homeId": "venezia",
       "awayId": "napoli",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://www.veneziafc.it/news/il-post-partita-di-venezia-napoli"
     },
     {
       "id": "bologna-inter",
@@ -1147,11 +1284,12 @@
       "kickoff": "2026-10-17T18:00:00+02:00",
       "homeId": "bologna",
       "awayId": "inter",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "roma-genoa",
@@ -1160,11 +1298,12 @@
       "kickoff": "2026-10-17T20:45:00+02:00",
       "homeId": "roma",
       "awayId": "genoa",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "udinese-lecce",
@@ -1173,11 +1312,12 @@
       "kickoff": "2026-10-18T12:30:00+02:00",
       "homeId": "udinese",
       "awayId": "lecce",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "fiorentina-como",
@@ -1186,11 +1326,12 @@
       "kickoff": "2026-10-18T15:00:00+02:00",
       "homeId": "fiorentina",
       "awayId": "como",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "milan-atalanta",
@@ -1199,11 +1340,12 @@
       "kickoff": "2026-10-18T18:00:00+02:00",
       "homeId": "milan",
       "awayId": "atalanta",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "juventus-lazio",
@@ -1212,11 +1354,12 @@
       "kickoff": "2026-10-18T20:45:00+02:00",
       "homeId": "juventus",
       "awayId": "lazio",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "monza-cagliari",
@@ -1225,11 +1368,13 @@
       "kickoff": "2026-10-19T18:30:00+02:00",
       "homeId": "monza",
       "awayId": "cagliari",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 4,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "verified-club-results",
+      "resultReferenceUrl": "https://www.acmonza.com/it/news/monza-cagliari-report-19102026/"
     },
     {
       "id": "parma-torino",
@@ -1238,11 +1383,12 @@
       "kickoff": "2026-10-19T20:45:00+02:00",
       "homeId": "parma",
       "awayId": "torino",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "torino-monza",
@@ -1251,11 +1397,12 @@
       "kickoff": "2026-10-23T20:45:00+02:00",
       "homeId": "torino",
       "awayId": "monza",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "cagliari-bologna",
@@ -1264,11 +1411,12 @@
       "kickoff": "2026-10-24T15:00:00+02:00",
       "homeId": "cagliari",
       "awayId": "bologna",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "como-sassuolo",
@@ -1277,11 +1425,12 @@
       "kickoff": "2026-10-24T15:00:00+02:00",
       "homeId": "como",
       "awayId": "sassuolo",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "napoli-roma",
@@ -1290,11 +1439,12 @@
       "kickoff": "2026-10-24T18:00:00+02:00",
       "homeId": "napoli",
       "awayId": "roma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "lazio-parma",
@@ -1303,11 +1453,12 @@
       "kickoff": "2026-10-24T20:45:00+02:00",
       "homeId": "lazio",
       "awayId": "parma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "inter-fiorentina",
@@ -1316,11 +1467,12 @@
       "kickoff": "2026-10-25T12:30:00+01:00",
       "homeId": "inter",
       "awayId": "fiorentina",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "atalanta-frosinone",
@@ -1329,11 +1481,12 @@
       "kickoff": "2026-10-25T15:00:00+01:00",
       "homeId": "atalanta",
       "awayId": "frosinone",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 4,
+      "awayGoals": 4,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "genoa-venezia",
@@ -1342,11 +1495,12 @@
       "kickoff": "2026-10-25T15:00:00+01:00",
       "homeId": "genoa",
       "awayId": "venezia",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "lecce-juventus",
@@ -1355,11 +1509,12 @@
       "kickoff": "2026-10-25T18:00:00+01:00",
       "homeId": "lecce",
       "awayId": "juventus",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "udinese-milan",
@@ -1368,11 +1523,12 @@
       "kickoff": "2026-10-25T20:45:00+01:00",
       "homeId": "udinese",
       "awayId": "milan",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "sassuolo-lazio",
@@ -1381,11 +1537,12 @@
       "kickoff": "2026-10-27T18:30:00+01:00",
       "homeId": "sassuolo",
       "awayId": "lazio",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 6,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "roma-cagliari",
@@ -1394,11 +1551,12 @@
       "kickoff": "2026-10-27T20:45:00+01:00",
       "homeId": "roma",
       "awayId": "cagliari",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 4,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "torino-como",
@@ -1407,11 +1565,12 @@
       "kickoff": "2026-10-27T20:45:00+01:00",
       "homeId": "torino",
       "awayId": "como",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "milan-bologna",
@@ -1420,11 +1579,12 @@
       "kickoff": "2026-10-28T18:30:00+01:00",
       "homeId": "milan",
       "awayId": "bologna",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 4,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "parma-udinese",
@@ -1433,11 +1593,12 @@
       "kickoff": "2026-10-28T18:30:00+01:00",
       "homeId": "parma",
       "awayId": "udinese",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "venezia-inter",
@@ -1446,11 +1607,12 @@
       "kickoff": "2026-10-28T18:30:00+01:00",
       "homeId": "venezia",
       "awayId": "inter",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "genoa-juventus",
@@ -1459,11 +1621,12 @@
       "kickoff": "2026-10-28T20:45:00+01:00",
       "homeId": "genoa",
       "awayId": "juventus",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "monza-napoli",
@@ -1472,11 +1635,12 @@
       "kickoff": "2026-10-28T20:45:00+01:00",
       "homeId": "monza",
       "awayId": "napoli",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 4,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "frosinone-lecce",
@@ -1485,11 +1649,12 @@
       "kickoff": "2026-10-29T18:30:00+01:00",
       "homeId": "frosinone",
       "awayId": "lecce",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 5,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "fiorentina-atalanta",
@@ -1498,11 +1663,12 @@
       "kickoff": "2026-10-29T20:45:00+01:00",
       "homeId": "fiorentina",
       "awayId": "atalanta",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "bologna-monza",
@@ -1511,11 +1677,12 @@
       "kickoff": "2026-10-31T15:00:00+01:00",
       "homeId": "bologna",
       "awayId": "monza",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "udinese-roma",
@@ -1524,11 +1691,12 @@
       "kickoff": "2026-10-31T18:00:00+01:00",
       "homeId": "udinese",
       "awayId": "roma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 5,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "milan-inter",
@@ -1537,11 +1705,12 @@
       "kickoff": "2026-10-31T20:45:00+01:00",
       "homeId": "milan",
       "awayId": "inter",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "como-venezia",
@@ -1550,11 +1719,12 @@
       "kickoff": "2026-11-01T12:30:00+01:00",
       "homeId": "como",
       "awayId": "venezia",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "frosinone-torino",
@@ -1563,11 +1733,12 @@
       "kickoff": "2026-11-01T15:00:00+01:00",
       "homeId": "frosinone",
       "awayId": "torino",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "lazio-cagliari",
@@ -1576,11 +1747,12 @@
       "kickoff": "2026-11-01T15:00:00+01:00",
       "homeId": "lazio",
       "awayId": "cagliari",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "lecce-genoa",
@@ -1589,11 +1761,12 @@
       "kickoff": "2026-11-01T18:00:00+01:00",
       "homeId": "lecce",
       "awayId": "genoa",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "juventus-napoli",
@@ -1602,11 +1775,12 @@
       "kickoff": "2026-11-01T20:45:00+01:00",
       "homeId": "juventus",
       "awayId": "napoli",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "sassuolo-fiorentina",
@@ -1615,11 +1789,12 @@
       "kickoff": "2026-11-02T18:30:00+01:00",
       "homeId": "sassuolo",
       "awayId": "fiorentina",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 4,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "atalanta-parma",
@@ -1628,11 +1803,12 @@
       "kickoff": "2026-11-02T20:45:00+01:00",
       "homeId": "atalanta",
       "awayId": "parma",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 3,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "venezia-udinese",
@@ -1641,11 +1817,12 @@
       "kickoff": "2026-11-06T20:45:00+01:00",
       "homeId": "venezia",
       "awayId": "udinese",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "cagliari-frosinone",
@@ -1654,11 +1831,12 @@
       "kickoff": "2026-11-07T15:00:00+01:00",
       "homeId": "cagliari",
       "awayId": "frosinone",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "torino-lecce",
@@ -1667,11 +1845,12 @@
       "kickoff": "2026-11-07T15:00:00+01:00",
       "homeId": "torino",
       "awayId": "lecce",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "parma-bologna",
@@ -1680,11 +1859,12 @@
       "kickoff": "2026-11-07T18:00:00+01:00",
       "homeId": "parma",
       "awayId": "bologna",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "roma-sassuolo",
@@ -1693,11 +1873,12 @@
       "kickoff": "2026-11-07T20:45:00+01:00",
       "homeId": "roma",
       "awayId": "sassuolo",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 3,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "napoli-lazio",
@@ -1706,11 +1887,12 @@
       "kickoff": "2026-11-08T12:30:00+01:00",
       "homeId": "napoli",
       "awayId": "lazio",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "genoa-milan",
@@ -1719,11 +1901,12 @@
       "kickoff": "2026-11-08T15:00:00+01:00",
       "homeId": "genoa",
       "awayId": "milan",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 1,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "monza-atalanta",
@@ -1732,11 +1915,12 @@
       "kickoff": "2026-11-08T15:00:00+01:00",
       "homeId": "monza",
       "awayId": "atalanta",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 0,
+      "awayGoals": 1,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "inter-como",
@@ -1745,11 +1929,12 @@
       "kickoff": "2026-11-08T18:00:00+01:00",
       "homeId": "inter",
       "awayId": "como",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 0,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "fiorentina-juventus",
@@ -1758,11 +1943,12 @@
       "kickoff": "2026-11-08T20:45:00+01:00",
       "homeId": "fiorentina",
       "awayId": "juventus",
-      "status": "unknown",
-      "homeGoals": null,
-      "awayGoals": null,
+      "status": "played",
+      "homeGoals": 2,
+      "awayGoals": 2,
       "homeXg": null,
-      "awayXg": null
+      "awayXg": null,
+      "resultSourceId": "footballanalytics"
     },
     {
       "id": "como-cagliari",

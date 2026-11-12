@@ -1,0 +1,34 @@
+{
+  "season": "2026/27",
+  "capturedOn": "2026-11-12",
+  "fixturesWithXg": 110,
+  "source": {
+    "id": "calcioit-team-xg",
+    "name": "calcio.it",
+    "url": "https://calcio.it/serie-a/tendenze",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "teams": [
+    { "id": "atalanta", "xgMatches": 11, "xg": 17.22 },
+    { "id": "bologna", "xgMatches": 11, "xg": 17.38 },
+    { "id": "cagliari", "xgMatches": 11, "xg": 12.91 },
+    { "id": "como", "xgMatches": 11, "xg": 18.52 },
+    { "id": "fiorentina", "xgMatches": 11, "xg": 18.34 },
+    { "id": "frosinone", "xgMatches": 11, "xg": 19.61 },
+    { "id": "genoa", "xgMatches": 11, "xg": 10.35 },
+    { "id": "inter", "xgMatches": 11, "xg": 28.61 },
+    { "id": "juventus", "xgMatches": 11, "xg": 16.23 },
+    { "id": "lazio", "xgMatches": 11, "xg": 17.05 },
+    { "id": "lecce", "xgMatches": 11, "xg": 13.75 },
+    { "id": "milan", "xgMatches": 11, "xg": 17.68 },
+    { "id": "monza", "xgMatches": 11, "xg": 17.61 },
+    { "id": "napoli", "xgMatches": 11, "xg": 19.73 },
+    { "id": "parma", "xgMatches": 11, "xg": 8.92 },
+    { "id": "roma", "xgMatches": 11, "xg": 26.81 },
+    { "id": "sassuolo", "xgMatches": 11, "xg": 14.16 },
+    { "id": "torino", "xgMatches": 11, "xg": 12.61 },
+    { "id": "udinese", "xgMatches": 11, "xg": 13.11 },
+    { "id": "venezia", "xgMatches": 11, "xg": 15.99 }
+  ]
+}

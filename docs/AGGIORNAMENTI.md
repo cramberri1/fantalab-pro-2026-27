@@ -8,7 +8,7 @@ Il sito legge lo snapshot unificato `data/serie-a-2026-27.json`. Le chiavi `team
 2. In **Settings → Pages → Build and deployment**, scegli **GitHub Actions** come sorgente.
 3. In **Actions**, apri **Aggiorna FantaLab Pro e pubblica su Pages** e usa **Run workflow** su `main`.
 
-Il workflow parte anche a ogni push su `main` e tutti i giorni alle 04:37 UTC. OpenFootball e TransferBeat si aggiornano senza chiavi. Un errore di rete, quota, integrità o licenza configurata fa fallire il job prima della pubblicazione. Il sito continua a servire l’ultimo deploy riuscito. Il workflow pubblica soltanto i file dell’app e gli snapshot normalizzati.
+Il workflow parte anche a ogni push su `main` e tutti i giorni alle 04:37 UTC. OpenFootball, l’export con licenza di Football Analytics e TransferBeat si aggiornano senza chiavi. Gli xG di squadra di calcio.it provengono dallo snapshot con attribuzione incluso nei sorgenti. Un errore di rete, quota, integrità o licenza configurata fa fallire il job prima della pubblicazione. Il sito continua a servire l’ultimo deploy riuscito. Il workflow pubblica soltanto i file dell’app e gli snapshot normalizzati.
 
 Per validare o aggiornare i dati in locale, dalla cartella del progetto con Python 3.11 o successivo:
 
@@ -18,7 +18,7 @@ python tools/update_data.py
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Gli aggiornamenti locali con `--openfootball-file`, `--roster-file` e `--ratings-dir` usano file originali scaricati a parte. Per lavorare sul solo calendario usa `--calendar-only`. Su Windows, se Python non trova il fuso `Europe/Rome`, installa `tzdata` con `python -m pip install tzdata`.
+Gli aggiornamenti locali con `--openfootball-file`, `--footballanalytics-file`, `--roster-file` e `--ratings-dir` usano file originali scaricati a parte. Per lavorare sul solo calendario usa `--calendar-only`. Su Windows, se Python non trova il fuso `Europe/Rome`, installa `tzdata` con `python -m pip install tzdata`.
 
 ## API-Football
 
