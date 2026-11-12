@@ -12,7 +12,8 @@ const SHORT = { GK: 'P', DEF: 'D', MID: 'C', FWD: 'A' };
 const COVERAGE = {
   fixtures: 'Calendario', results: 'Risultati', players: 'Listone calciatori',
   playerStats: 'Statistiche individuali', ratings: 'Voti storici FantaTB', expectedGoals: 'xG individuali',
-  expectedAssists: 'xA individuali', absences: 'Indisponibilità'
+  expectedAssists: 'xA individuali', teamExpectedGoals: 'xG stagionali di squadra', fixtureExpectedGoals: 'xG delle singole partite',
+  absences: 'Indisponibilità'
 };
 const STATUS = { available: 'Disponibile', partial: 'Parziale', missing: 'Mancante', demo: 'Demo' };
 const ICONS = {
@@ -319,7 +320,7 @@ function panoramica() {
   </section>
   <div class="split">
     <section class="panel"><div class="panel-head"><div><h2>Partite della giornata</h2><p>Giornata ${round} · ${fixtures.length} incontri</p></div><a class="text-link" href="#match">Tutti gli incontri →</a></div>${fixtureList(fixtures.slice(0, 5))}</section>
-    <section class="panel"><div class="panel-head"><h2>Copertura dati</h2><a class="text-link" href="#fonti">Vedi fonti →</a></div>${coverageRows(['fixtures','results','players','ratings','expectedGoals','expectedAssists','absences'])}</section>
+    <section class="panel"><div class="panel-head"><h2>Copertura dati</h2><a class="text-link" href="#fonti">Vedi fonti →</a></div>${coverageRows(['fixtures','results','players','ratings','teamExpectedGoals','expectedGoals','expectedAssists','absences'])}</section>
   </div>`;
 }
 function previousForm(teamId, fixture) {
@@ -370,6 +371,19 @@ function threeWay(home, away) {
 function formSummary(form) {
   return form ? `${form.n} partite acquisite · G${form.oldestRound}–G${form.newestRound} · ${number(form.gf, 2)} gol fatti / ${number(form.ga, 2)} subiti a partita` : 'Meno di tre risultati precedenti acquisiti';
 }
+function sourceLink(id) {
+  const source = dataset.sources.find(item => item.id === id);
+  const href = safeUrl(source?.url);
+  return href ? `<a class="text-link" href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(source.name)}</a>` : '';
+}
+function teamSeasonXg(fixture) {
+  const teams = [getTeam(fixture.homeId),getTeam(fixture.awayId)].filter(team => Number.isFinite(team?.stats?.xg));
+  if (mode !== 'real' || !teams.length) return '';
+  return `<div class="duel"><h3>xG stagionali di squadra</h3>${teams.map(team => {
+    const stats = team.stats;
+    return `<p>${html(team.shortName)} · ${number(stats.xg,2)} xG${Number.isFinite(stats.xga) ? ` · ${number(stats.xga,2)} xGA` : ''}${Number.isFinite(stats.xgMatches) ? ` · ${number(stats.xgMatches)} partite misurate` : ''}</p>`;
+  }).join('')}<p>Totali dello snapshot stagionale. ${sourceLink(teams[0].stats.xgSource)}</p></div>`;
+}
 function matchCard(fixture) {
   if (!fixture) return empty('Seleziona un incontro.');
   const home = previousForm(fixture.homeId, fixture);
@@ -380,9 +394,10 @@ function matchCard(fixture) {
   const absences = dataset.absences.filter(a => a.fixtureId === fixture.id);
   const statusLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Stato mancante' };
   return `<div class="detail-header"><h2>${html(getTeam(fixture.homeId)?.shortName)} – ${html(getTeam(fixture.awayId)?.shortName)}</h2>${status(score(fixture), fixture.status === 'played' ? 'available' : 'missing')}</div>
-    <p>${html(matchTime(fixture))}</p>
+    <p>${html(matchTime(fixture))}${fixture.resultSourceId ? ` · ${sourceLink(fixture.resultSourceId)}` : ''}</p>
     <div class="duel"><h3>Andamento prima della partita</h3><p>Casa · ${formSummary(home)}</p><p>Trasferta · ${formSummary(away)}</p>
       <p>xG / xGA a partita · casa ${number(home?.xg, 2)} / ${number(home?.xga, 2)} · trasferta ${number(away?.xg, 2)} / ${number(away?.xga, 2)}</p></div>
+    ${teamSeasonXg(fixture)}
     <div class="duel"><h3>Difficoltà per reparto</h3><p>Stima dai risultati precedenti acquisiti, fino a cinque partite per squadra. Il centrocampo usa una media dei due indicatori di squadra.</p></div>
     ${rows.map(([label, role, hint]) => `<div class="duel"><div class="duel-row"><span>${status(opponentLevel(away, role), away ? 'partial' : 'missing')}</span><strong>${label}</strong><span>${status(opponentLevel(home, role), home ? 'partial' : 'missing')}</span></div><p>${hint}</p></div>`).join('')}
     ${odds ? `<div class="duel"><h3>Stima 1X2</h3><div class="probability" aria-hidden="true">${odds.map(value => `<span style="width:${value * 100}%"></span>`).join('')}</div>
@@ -495,6 +510,9 @@ function showPlayer(id) {
   const a = playerAnalysis(p);
   const games = p.history ?? [];
   const votes = p.ratings ?? [];
+  const ratingValues = votes.map(row => row.rating).filter(Number.isFinite);
+  const fantasyValues = votes.map(row => row.fantasyRating).filter(Number.isFinite);
+  const average = values => values.length ? values.reduce((sum,value) => sum + value,0) / values.length : null;
   const availabilityLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Mancante' };
   const availability = a.availability?.status ?? 'unknown';
   const projected = a.projection;
@@ -517,7 +535,10 @@ function showPlayer(id) {
       ${a.notes.length ? `<ul class="muted">${a.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
     </section>
     ${games.length ? `<section class="dialog-section"><h3>xG e xA per giornata</h3>${historyChart(games, ['xg','xa'], ['xG','xA'], 1, 'Andamento xG e xA')}</section>` : ''}
-    ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>${historyChart(votes, ['rating','fantasyRating'], ['Voto','Fantavoto'], 8, 'Andamento voti FantaTB')}</section>` : ''}
+    ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>
+      <div class="detail-grid">${stat('Voti acquisiti',number(ratingValues.length))}${stat('Media voto acquisita',number(average(ratingValues),2))}
+      ${stat('Fantavoti acquisiti',number(fantasyValues.length))}${stat('Fantamedia acquisita',number(average(fantasyValues),2))}</div>
+      ${historyChart(votes, ['rating','fantasyRating'], ['Voto','Fantavoto'], 8, 'Andamento voti FantaTB')}</section>` : ''}
     ${!games.length && !votes.length ? '<p class="inline-status">Storico individuale mancante.</p>' : ''}
     ${!games.length && votes.length ? '<p class="inline-status">Serie per giornata di xG e xA mancante.</p>' : ''}
     ${Number.isFinite(a.expectedPoints) && a.fixture ? `<section class="dialog-section"><button data-simulate-player="${html(p.id)}">Simula il calciatore</button><div id="individual-simulation" class="dialog-section" aria-live="polite"></div></section>` : ''}`;
@@ -761,7 +782,9 @@ function fonti() {
   const sources = dataset.sources.map(source => {
     const href = safeUrl(source.url);
     return `<li>${href ? `<a href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(source.name)}</a>` : html(source.name)}
-      ${source.license ? ` · ${html(source.license)}` : ''}${source.updatedAt ? ` · aggiornato ${html(date(source.updatedAt))}` : ''}${source.note ? `<br>${html(source.note)}` : ''}</li>`;
+      ${source.license ? ` · ${html(source.license)}` : ''}${source.updatedAt ? ` · aggiornato ${html(date(source.updatedAt))}` : ''}
+      ${source.latestResultDate ? ` · ultimo risultato ${html(date(source.latestResultDate))}` : ''}
+      ${source.note || source.modifications ? `<br>${html(source.note ?? source.modifications)}` : ''}</li>`;
   });
   return `${heading('Fonti e metodo', 'Controlla la provenienza, la copertura e le ipotesi delle stime.')}
   <div class="split"><section class="panel prose"><h2>Provenienza dei dati</h2>
@@ -882,9 +905,11 @@ function marketCard(result, trade = false) {
     <details><summary>Come si confrontano</summary><div class="table-wrap"><table>
       <thead><tr><th>Indicatore</th><th class="numeric">In uscita</th><th class="numeric">In entrata</th></tr></thead>
       <tbody>
-        ${[['Indice',outgoing.score,incoming.score,0],['FM su partite a voto',outgoing.fantasyAverage,incoming.fantasyAverage,2],
+        ${[['Indice',outgoing.score,incoming.score,0],['Media voto',outgoing.averageRating,incoming.averageRating,2],
+          ['FM su partite a voto',outgoing.fantasyAverage,incoming.fantasyAverage,2],
           ['FM corretta per campione',outgoing.adjustedFantasy,incoming.adjustedFantasy,2],
-          ['Partite a voto',outgoing.appearances,incoming.appearances,0],['Quotazione',outgoing.price,incoming.price,0]]
+          ['Partite a voto',outgoing.appearances,incoming.appearances,0],['Quotazione',outgoing.price,incoming.price,0],
+          ['Costo storico',outgoing.cost,incoming.cost,0]]
           .map(([name,before,after,digits]) => `<tr><th scope="row">${name}</th><td class="numeric">${number(before,digits)}</td><td class="numeric">${number(after,digits)}</td></tr>`).join('')}
       </tbody></table></div>
       <p>${html(result.reason ?? '')}</p>
@@ -934,10 +959,15 @@ function marketResults(market) {
     const assigned = market.catalog.filter(p => p.availability === 'owned' && !ownPlayers.has(p.key)
       && !(owners.size === 1 && owners.has(p.owner)) && (!outgoing || p.position === outgoing.position) && marketMatch(p))
       .sort(sortByScore);
+    const ranked = outgoing ? assigned.map(p => compareMarketTrade(market, outgoing.key, p.key)).filter(result => result.ok) : [];
+    const comparisons = outgoing ? new Map(ranked.map(result => [result.incoming.key,result])) : null;
+    const suggestions = ranked.filter(result => result.signal === 'upgrade').slice(0,3);
     const comparison = outgoing && marketFilters.incoming
       ? compareMarketTrade(market, outgoing.key, marketFilters.incoming, { creditDifference: creditInput(marketFilters.credits) }) : null;
     return `${rosterHint}${outgoing ? '' : '<p class="inline-status">Seleziona un giocatore in uscita per confrontare uno scambio a parità di ruolo.</p>'}
-      ${marketCard(comparison,true)}${marketList(assigned,null,Boolean(outgoing))}`;
+      ${comparison ? marketCard(comparison,true) : suggestions.length ? `<div class="market-suggestions"><h3>Scambi da valutare</h3>
+        ${suggestions.map(result => marketCard(result,true)).join('')}</div>` : ''}
+      ${marketList(assigned,comparisons,Boolean(outgoing))}`;
   }
   if (!marketImports.svincolati) return empty('Carica l’elenco degli svincolati per restringere i suggerimenti alla tua lega.');
   const eligible = market.freeAgents.filter(p => withinBudget(p) && marketMatch(p)).sort(sortByScore);

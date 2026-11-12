@@ -9,7 +9,10 @@ const matchCount = value => Number.isInteger(value) && value >= 0 ? value : null
 const label = value => String(value ?? '').trim();
 const normalized = value => label(value).normalize('NFKD').replace(/\p{Mark}/gu, '')
   .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-const rowsOf = imported => Array.isArray(imported) ? imported : Array.isArray(imported?.rows) ? imported.rows : [];
+const rowsOf = imported => {
+  const rows = imported?.rows ?? imported;
+  return Array.isArray(rows) ? rows : [];
+};
 const clamp100 = value => Math.min(100, Math.max(0, value));
 
 function groupBy(values, keyFor) {
@@ -324,8 +327,7 @@ export function compareMarketTrade(market, outgoingKey, incomingKey, { creditDif
   if (!outgoing || !incoming) reason = 'Seleziona entrambi i calciatori.';
   else if (market.excludedKeys.has(incoming.key) || ownTeams.size === 1 && ownTeams.has(incoming.owner)) {
     reason = 'Il calciatore è già in rosa, è della stessa squadra fantasy o coincide con un abbinamento da verificare.';
-  }
-  else if (incoming.source !== 'listone') reason = 'Seleziona un calciatore del listone completo per lo scambio.';
+  } else if (incoming.source !== 'listone') reason = 'Seleziona un calciatore del listone completo per lo scambio.';
   else if (incoming.availability !== 'owned') reason = 'Per lo scambio serve un calciatore assegnato nel listone della lega.';
   else if (incoming.position !== outgoing.position) reason = 'Il confronto uno contro uno richiede lo stesso ruolo Classic.';
   if (reason) return { ok: false, reason, outgoing, incoming, delta: null, signal: 'insufficient', creditDifference: null };
