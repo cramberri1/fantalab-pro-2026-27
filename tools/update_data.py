@@ -24,6 +24,7 @@ ROSTER_URL = 'https://transferbeat.com/data/fanta/listone.json'
 ROSTER_CREDIT = 'https://transferbeat.com/fantacalcio/listone.html'
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / 'data' / 'serie-a-2026-27.json'
+TEAM_XG_SEED = ROOT / 'data' / 'calcioit-team-xg.json'
 CLUBS = {
     'AC Milan': ('milan', 'Milan'),
     'AC Monza': ('monza', 'Monza'),
@@ -315,6 +316,7 @@ def main():
     parser.add_argument('--openfootball-file', type=Path, help='Snapshot originale OpenFootball, per aggiornare offline.')
     parser.add_argument('--roster-file', type=Path, help='Listone originale TransferBeat, per aggiornare offline.')
     parser.add_argument('--ratings-dir', type=Path, help='Cartella con le rilevazioni originali TransferBeat, per aggiornare offline.')
+    parser.add_argument('--footballanalytics-file', type=Path, help='Export Serie A con licenza CC BY di Football Analytics, per aggiornare offline.')
     parser.add_argument('--calendar-only', action='store_true', help='Importa il solo calendario OpenFootball.')
     parser.add_argument('--output', type=Path, default=SNAPSHOT)
     parser.add_argument('--validate-only', type=Path, metavar='SNAPSHOT')
@@ -330,6 +332,11 @@ def main():
         raw = args.openfootball_file.read_bytes() if args.openfootball_file else fetch(OPEN_URL)[0]
         snapshot = make_snapshot(raw, now)
         if not args.calendar_only:
+            from open_results import add_footballanalytics, add_verified_results
+            if args.footballanalytics_file or not args.openfootball_file:
+                result_raw = args.footballanalytics_file.read_bytes() if args.footballanalytics_file else None
+                add_footballanalytics(snapshot, now, result_raw)
+            add_verified_results(snapshot, now)
             roster = args.roster_file.read_bytes() if args.roster_file else fetch(ROSTER_URL)[0]
             add_roster(snapshot, roster, now)
             from ratings import add_ratings
@@ -344,6 +351,9 @@ def main():
             if args.with_metrics:
                 enrich_metrics(snapshot)
         calculate_team_stats(snapshot)
+        if not args.calendar_only:
+            from calcioit_stats import apply_calcioit_team_xg
+            apply_calcioit_team_xg(snapshot, TEAM_XG_SEED.read_bytes())
         validate(snapshot)
         write_atomic(args.output, snapshot)
         print(f"Snapshot aggiornato. {len(snapshot['fixtures'])} partite, {len(snapshot['players'])} giocatori, {len(snapshot['absences'])} segnalazioni.")

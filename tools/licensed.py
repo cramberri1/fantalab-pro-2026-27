@@ -282,8 +282,10 @@ def enrich_metrics(snapshot):
     coverage = snapshot['coverage']
     if any(p.get(field) is not None for p in players.values() for field in PLAYER_FIELDS):
         coverage['playerStats'] = 'partial'
-    if any(p.get('xg') is not None for p in players.values()) or any(f.get('homeXg') is not None or f.get('awayXg') is not None for f in fixtures.values()):
+    if any(p.get('xg') is not None for p in players.values()):
         coverage['expectedGoals'] = 'partial'
+    if any(f.get('homeXg') is not None or f.get('awayXg') is not None for f in fixtures.values()):
+        coverage['fixtureExpectedGoals'] = 'partial'
     if any(p.get('xa') is not None for p in players.values()):
         coverage['expectedAssists'] = 'partial'
     if snapshot['absences']:
