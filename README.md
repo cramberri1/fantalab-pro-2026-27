@@ -24,9 +24,10 @@ In **Dati reali → Mercato**, carica separatamente l’Excel del **Listone comp
 
 L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, calciatori, statistiche e indisponibilità con ID stabili e metadati di provenienza. La demo ha un archivio a sé.
 
-- Calendario di 380 partite e 50 risultati finali OpenFootball, fino alla 5ª giornata.
+- Calendario di 380 partite. OpenFootball, Football Analytics e i referti dei club coprono tutti i 110 risultati finali fino alla 11ª giornata.
 - 652 voci del listone TransferBeat del 1° ottobre e 1.416 voti FantaTB delle prime cinque giornate.
-- xG, xA, minuti e altre statistiche individuali necessarie alle previsioni, nonché le indisponibilità attuali, richiedono un feed aggiuntivo. La modalità reale segnala le lacune. Gli indici e le simulazioni reali si attivano per i giocatori con dati sufficienti.
+- xG di squadra di calcio.it su 110 partite misurate, esposti con il loro campione.
+- xG e xA individuali, minuti e altre statistiche necessarie alle previsioni, nonché le indisponibilità attuali, richiedono un feed aggiuntivo. La modalità reale segnala le lacune. Gli indici e le simulazioni reali si attivano per i giocatori con dati sufficienti.
 
 [Fonti, licenze e copertura](docs/FONTI.md) · [Metodo e limiti del modello](docs/MODELLO.md)
 
