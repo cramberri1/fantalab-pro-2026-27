@@ -75,14 +75,17 @@ function replaceRequired(value, pattern, replacement) {
   return value.replace(pattern, replacement);
 }
 
-const [html, css, icon, model, rosterImport, app, real, demo] = await Promise.all([
+const [html, css, icon, model, rosterImport, marketImport, market, app, real, demo] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
-  read('js/roster-import.js'), read('js/app.js'), read('data/serie-a-2026-27.json'), read('data/demo.json')
+  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/app.js'),
+  read('data/serie-a-2026-27.json'), read('data/demo.json')
 ]);
 const styles = await inlineStyles(css);
 const modules = [
   { path: 'model.js', namespace: 'FantaLabModel', source: model },
-  { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport }
+  { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport },
+  { path: 'market-import.js', namespace: 'FantaLabMarketImport', source: marketImport },
+  { path: 'market.js', namespace: 'FantaLabMarket', source: market }
 ];
 const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'), `<script type="module">\n${inlineModules(app, modules)}\n</script>`];
 const withIcon = replaceRequired(html, /(<link rel="icon" href=")assets\/mark\.svg(")/, (_, start, end) => start + icon + end);
