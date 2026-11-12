@@ -6,7 +6,13 @@ App web per consultare il calendario, analizzare i calciatori e gestire le forma
 
 La copia `FantaLab-Pro.html` si apre direttamente nel browser e include uno snapshot dei dati e la demo. Per eseguire i sorgenti da questa cartella, avvia `python -m http.server 8000` e visita [localhost:8000](http://localhost:8000). Il browser usa HTTP per caricare i moduli e i file JSON della versione a più file.
 
-Per provare una simulazione completa, seleziona **Demo → La mia rosa → Carica rosa demo → Vai alla simulazione**. In modalità reale puoi comporre la rosa da listone o importare un CSV con `id` oppure `nome`, e facoltativamente `squadra`. Il backup JSON include entrambe le modalità e consente di trasferire la rosa in un altro browser. Ogni copia dell’app e ogni dispositivo hanno il proprio salvataggio locale.
+Per provare una simulazione completa, seleziona **Demo → La mia rosa → Carica rosa demo → Vai alla simulazione**. Il backup JSON include entrambe le modalità e consente di trasferire la rosa in un altro browser. Ogni copia dell’app e ogni dispositivo hanno il proprio salvataggio locale.
+
+### Importare una rosa
+
+In modalità **Dati reali**, apri **La mia rosa → Importa rosa CSV** e scegli l’export Classic di Fantacalcio.it. FantaLab usa nome, squadra e ruolo per cercare una corrispondenza univoca, anche quando i due listoni scrivono il nome in modi diversi. Le righe con squadra e ruolo riconosciuti che non trovano il calciatore nel listone vengono salvate nella tua rosa con l’etichetta **Da CSV · senza statistiche**. Il riepilogo segnala le righe ambigue. Le colonne delle quotazioni, dei costi, dei voti e dei prestiti non alimentano le statistiche dell’app.
+
+L’importazione si aggiunge alla rosa salvata ed evita duplicati. Il file viene elaborato nel browser. Per gli altri CSV usa una colonna `id` oppure `nome` e, facoltativamente, `squadra`.
 
 ## Dati e copertura
 
@@ -31,6 +37,6 @@ Il workflow pianificato aggiorna le fonti aperte ogni giorno alle 04:37 UTC e pu
 ```sh
 python -m unittest discover -s tests -p 'test_*.py'
 python tools/update_data.py --validate-only data/serie-a-2026-27.json
-node --test tests/model.test.mjs
+node --test tests/*.test.mjs
 node tools/build_offline.mjs ../FantaLab-Pro.html
 ```
