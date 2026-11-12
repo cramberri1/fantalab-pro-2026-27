@@ -14,6 +14,12 @@ In modalità **Dati reali**, apri **La mia rosa → Importa rosa CSV** e scegli 
 
 L’importazione si aggiunge alla rosa salvata ed evita duplicati. Il file viene elaborato nel browser. Per gli altri CSV usa una colonna `id` oppure `nome` e, facoltativamente, `squadra`.
 
+### Mercato della lega
+
+In **Dati reali → Mercato**, carica separatamente l’Excel del **Listone completo** e quello degli **Svincolati della lega**. Il listone è consultabile e ricercabile. **Riparazione** confronta la rosa con gli svincolati, mentre **Scambi** confronta una coppia dello stesso ruolo. Le analisi usano le statistiche effettivamente disponibili, con evidenza del campione e quotazioni indicative. Gli Excel e i dati estratti restano nel browser.
+
+[Caricamento degli Excel e metodo del mercato](docs/MERCATO.md)
+
 ## Dati e copertura
 
 L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, calciatori, statistiche e indisponibilità con ID stabili e metadati di provenienza. La demo ha un archivio a sé.

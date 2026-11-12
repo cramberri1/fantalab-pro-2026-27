@@ -151,6 +151,24 @@ main { min-width: 0; }
 .probability span:nth-child(2) { background: #7b9a8c; }
 .probability span:nth-child(3) { background: #b2b8fa; }
 .table-wrap { overflow-x: auto; }
+.market-inputs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.market-file h2 { font-size: 1.15rem; }
+.market-file .panel-head { margin-bottom: 4px; }
+.market-workbench { margin-top: 11px; }
+.market-tabs { width: fit-content; max-width: 100%; flex-wrap: wrap; margin-bottom: 13px; }
+.market-filters { align-items: end; }
+.market-filters label { min-width: 0; }
+.market-filters .market-query { flex: 1 1 190px; }
+.market-filters input[type=number] { width: 130px; }
+.market-filters #market-outgoing { max-width: 245px; }
+.market-suggestions { display: grid; gap: 7px; margin-bottom: 15px; }
+.market-suggestions > .muted, .market-method p, .market-method li { font-size: .82rem; }
+.market-comparison { padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; background: #17231c; margin-bottom: 6px; }
+.market-comparison .panel-head { margin-bottom: 6px; }
+.market-comparison p, .market-comparison details, .market-method { color: var(--muted); font-size: .83rem; margin-top: 6px; }
+.market-facts { display: flex; gap: 6px 14px; flex-wrap: wrap; color: var(--green); font-size: .83rem; font-variant-numeric: tabular-nums; }
+.market-coverage { margin-bottom: 10px; }
+.market-method { margin-top: 13px; border-top: 1px solid var(--border); padding-top: 9px; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: .87rem; font-variant-numeric: tabular-nums; }
 th, td { border-bottom: 1px solid var(--border); padding: 9px 10px; white-space: nowrap; }
 th { color: var(--soft); font-size: .76rem; }
@@ -230,6 +248,7 @@ dialog::backdrop { background: #050a07cf; }
   .topbar { min-height: 57px; }
 }
 @media (max-width: 590px) {
+  .market-inputs { grid-template-columns: minmax(0,1fr); gap: 7px; }
   #view, #mode-notice, .footer, .topbar { padding-inline: 12px; }
   #view { padding-top: 13px; }
   .topbar { flex-wrap: wrap; gap: 6px; }
