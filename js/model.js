@@ -8,9 +8,15 @@ const PENDING = new Set(['scheduled', 'timed', 'upcoming', 'tbd', 'ns', 'not sta
 const RULED_OUT = new Set(['out', 'injured', 'suspended', 'unavailable', 'ruled_out', 'ruled out']);
 const QUESTIONABLE = new Set(['doubtful', 'questionable', 'doubt', 'probable', 'uncertain']);
 const CONFIRMED = new Set(['available', 'fit', 'cleared']);
+const METHODS = ['events', 'league-average', 'fantatb-history'];
+const FANTASY_SOURCE = 'transferbeat-ratings';
+const MIN_HISTORICAL_OBSERVATIONS = 3;
+const MIN_HISTORICAL_VOTES = 2;
+const MIN_LEAGUE_VOTES = 3;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const present = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const statusKey = (value) => String(value ?? '').trim().toLowerCase();
 const sameId = (left, right) => left != null && right != null && String(left) === String(right);
 const sum = (items) => items.reduce((total, value) => total + value, 0);
@@ -213,9 +219,97 @@ function indexComponents(projection, teamGames, position) {
   return { components, coverage: availableWeight / 100, index: Math.round(sum(components.map((component) => component.contribution ?? 0))) };
 }
 
+function historicalFantasy(record, dataset, fixture, asOf) {
+  const source = dataset.sources?.find((item) => item.id === FANTASY_SOURCE);
+  if (!source || !Array.isArray(source.archives) || !Array.isArray(record.ratings)) return null;
+  const cutoff = fixtureTime(fixture);
+  const allowNoVote = source.ambiguousRatings === 0;
+  const archives = new Map(source.archives.map((archive) => [archive.round, archive]));
+  const seen = new Set();
+  const observations = [];
+  const rounds = [];
+  const fixtureDates = [];
+
+  for (const row of record.ratings) {
+    if (!Number.isInteger(row.round) || row.round >= fixture.round || seen.has(row.round)) continue;
+    const archive = archives.get(row.round);
+    const published = Date.parse(archive?.updatedAt ?? '');
+    const fixtures = dataset.fixtures.filter((match) => match.round === row.round);
+    if (!Number.isFinite(published) || published >= cutoff || published > asOf || !fixtures.length
+      || !fixtures.every((match) => COMPLETED.has(statusKey(match.status)) && fixtureTime(match) < cutoff
+        && fixtureTime(match) <= asOf)) continue;
+    seen.add(row.round);
+
+    if (finite(row.rating) && finite(row.fantasyRating)) observations.push(row.fantasyRating);
+    else if (allowNoVote && row.rating === null && row.fantasyRating === null) observations.push(null);
+    else continue;
+
+    rounds.push(row.round);
+    fixtureDates.push(...fixtures.map((match) => match.date ?? new Date(fixtureTime(match)).toISOString().slice(0, 10)));
+  }
+  const scores = observations.filter(finite);
+  if (observations.length < MIN_HISTORICAL_OBSERVATIONS || scores.length < MIN_HISTORICAL_VOTES) return null;
+  return {
+    method: 'fantatb-history',
+    voteProbability: scores.length / observations.length,
+    scores,
+    sample: {
+      observations: observations.length, votes: scores.length,
+      rounds: rounds.sort((first, second) => first - second),
+      asOfRound: Math.max(...rounds), asOfDate: fixtureDates.sort().at(-1),
+    },
+  };
+}
+
+function leagueFantasy(record, dataset, fixture, sample, asOf) {
+  if (!sample) return null;
+  const { gamesWithVote, fantasyAverage, teamGames, asOfRound } = sample;
+  if (!Number.isInteger(gamesWithVote) || gamesWithVote < MIN_LEAGUE_VOTES || !finite(fantasyAverage)
+    || !Number.isInteger(teamGames) || gamesWithVote > teamGames || teamGames > 38
+    || !Number.isInteger(asOfRound) || asOfRound < 1 || fixture.round !== asOfRound + 1) return null;
+
+  const previous = dataset.fixtures.filter((match) => hasTeam(match, record.teamId) && match.round <= asOfRound);
+  if (previous.length !== teamGames || !previous.every((match) => COMPLETED.has(statusKey(match.status))
+    && fixtureTime(match) < fixtureTime(fixture) && fixtureTime(match) <= asOf)) return null;
+  const matchesAfterSample = dataset.fixtures.some((match) => hasTeam(match, record.teamId)
+    && match.round > asOfRound && COMPLETED.has(statusKey(match.status)));
+  if (matchesAfterSample) return null;
+  return {
+    method: 'league-average',
+    voteProbability: gamesWithVote / teamGames,
+    scores: [fantasyAverage],
+    sample: {
+      observations: teamGames, votes: gamesWithVote, asOfRound,
+      asOfDate: previous.map((match) => match.date ?? new Date(fixtureTime(match)).toISOString().slice(0, 10)).sort().at(-1),
+    },
+  };
+}
+
+function empiricalAnalysis(record, result, dataset, options) {
+  if (result.mode !== 'real' || !result.fixture || !Number.isFinite(fixtureTime(result.fixture))) return null;
+  const fromHistory = options.method === 'league-average' ? null : historicalFantasy(record, dataset, result.fixture, options.asOfTime);
+  const fromLeague = options.method === 'fantatb-history' ? null
+    : leagueFantasy(record, dataset, result.fixture, options.fantasySample, options.asOfTime);
+  const empirical = fromLeague && (!fromHistory || fromLeague.sample.asOfRound > fromHistory.sample.asOfRound) ? fromLeague : fromHistory;
+  if (!empirical) return null;
+  const { sample, method } = empirical;
+  const voteProbability = empirical.voteProbability * result.availability.multiplier;
+  const projection = { ...empirical, voteProbability, appearanceProbability: null, startProbability: null, expectedMinutes: null };
+  const notes = method === 'league-average'
+    ? [`Dati dell’Excel di lega fino alla giornata ${sample.asOfRound}. ${sample.votes} voti su ${sample.observations} partite della squadra. Ogni voto simulato usa la fantamedia del file. La variabilità del singolo voto non è disponibile.`]
+    : [`Fantavoti FantaTB dalle giornate ${sample.rounds.join(', ')}. ${sample.votes} voti su ${sample.observations} registrazioni esplicite. Le righe mancanti sono escluse.`];
+  if (result.availability.status === 'unknown') notes.push('Disponibilità per la giornata non verificata.');
+  if (result.availability.status === 'reported') notes.push(`Segnalazione senza esito confermato. ${result.availability.reason}.`);
+  if (result.availability.status === 'doubtful') notes.push('Giocatore in dubbio. La probabilità di ricevere voto è ridotta del 25%.');
+  return { ...result, projection, expectedPoints: voteProbability * average(empirical.scores), notes, status: 'estimated' };
+}
+
 export function analyzePlayer(player, options = {}) {
   const { dataset, round, mode = dataset?.mode } = options;
-  const record = dataset?.players?.find((item) => sameId(item.id, player?.id));
+  const localPlayer = mode === 'real' && options.fantasySample && typeof player?.id === 'string'
+    && player.id.startsWith('csv:') && POSITIONS.includes(player.position)
+    && (dataset?.teams ?? []).some((team) => sameId(team.id, player.teamId));
+  const record = dataset?.players?.find((item) => sameId(item.id, player?.id)) ?? (localPlayer ? player : null);
   const base = {
     mode,
     index: null,
@@ -244,30 +338,44 @@ export function analyzePlayer(player, options = {}) {
     const status = COMPLETED.has(statusKey(fixture.status)) ? 'historical' : 'insufficient';
     return { ...result, status, notes: ['Proiezione disponibile per le partite da giocare.'] };
   }
+  const asOf = options.asOf == null ? Date.now() : new Date(options.asOf).valueOf();
+  if (mode === 'real' && fixture && (!Number.isFinite(fixtureTime(fixture)) || !(fixtureTime(fixture) > asOf))) {
+    return { ...result, notes: ['La partita non ha un orario o una data futura verificabile.'] };
+  }
+  const empiricalOptions = { ...options, asOfTime: asOf };
 
   if (availability.status === 'out') {
     const projection = {
+      method: 'confirmed-out',
       appearanceProbability: 0, startProbability: 0, expectedMinutes: 0, goalRate: null, assistRate: null,
       goalRateSource: 'missing', assistRateSource: 'missing', matchFactor: null, concededRate: null, yellowRate: null, profiles: [],
     };
     return { ...result, index: 0, expectedPoints: 0, unavailable: true, projection, status: 'unavailable', notes: [`Indisponibilità segnalata per la partita. ${availability.reason}.`] };
   }
 
+  if (options.method && options.method !== 'events') {
+    return empiricalAnalysis(record, result, dataset, empiricalOptions)
+      ?? { ...result, notes: ['Campione di voti verificati insufficiente per questo metodo.'] };
+  }
+
   const completed = fixtures.filter((match) => finishedBefore(match, fixture));
   const teamGames = completed.filter((match) => hasTeam(match, record.teamId)).length;
   const teamGamesAll = fixtures.filter((match) => COMPLETED.has(statusKey(match.status)) && hasTeam(match, record.teamId)).length;
   if (teamGames < teamGamesAll) {
-    return { ...result, teamGames, notes: ['Le statistiche di stagione includono gare della squadra successive alla partita selezionata.'] };
+    return (options.method ? null : empiricalAnalysis(record, result, dataset, empiricalOptions))
+      ?? { ...result, teamGames, notes: ['Le statistiche di stagione includono gare della squadra successive alla partita selezionata.'] };
   }
   const playing = playingTime(record, teamGames, availability);
   if (!playing) {
-    return { ...result, teamGames, notes: ['Minuti, presenze o partite concluse insufficienti o incoerenti per stimare l’impiego.'] };
+    return (options.method ? null : empiricalAnalysis(record, result, dataset, empiricalOptions))
+      ?? { ...result, teamGames, notes: ['Minuti e presenze insufficienti. Servono almeno tre registrazioni FantaTB, di cui due con voto, oppure un Excel di lega verificato per la prossima giornata.'] };
   }
 
   const goalRate = per90(record.goals, record.xg, record.minutes);
   const assistRate = per90(record.assists, record.xa, record.minutes);
   const matchup = fixtureProjection(record, fixture, completed);
   const projection = {
+    method: 'events',
     ...playing,
     ...matchup,
     goalRate: goalRate.value == null ? null : goalRate.value * (matchup.attackFactor ?? 1),
@@ -278,6 +386,10 @@ export function analyzePlayer(player, options = {}) {
   };
   const ratings = indexComponents({ ...projection, goalRate: goalRate.value, assistRate: assistRate.value }, teamGames, record.position);
   const expectedPoints = expectedScore(projection);
+  if (expectedPoints == null && !options.method) {
+    const empirical = empiricalAnalysis(record, result, dataset, empiricalOptions);
+    if (empirical) return empirical;
+  }
   const notes = [];
   if (!fixture) notes.push('Stima media di stagione senza una partita associata.');
   if (dataset.coverage?.fixtures === 'partial' || dataset.coverage?.results === 'partial') {
@@ -333,6 +445,10 @@ function poisson(lambda, rng) {
 
 function drawScore(projection, rng) {
   const draw = rng();
+  if (projection.method === 'fantatb-history' || projection.method === 'league-average') {
+    if (draw >= projection.voteProbability) return null;
+    return projection.scores[Math.floor(rng() * projection.scores.length)];
+  }
   let cumulative = 0;
   for (const profile of projection.profiles) {
     cumulative += profile.probability;
@@ -360,14 +476,15 @@ function makeHistogram(values) {
     const index = Math.min(bins.length - 1, Math.floor((score - minimum) / width));
     bins[index].count += 1;
   }
-  return bins.map((bin) => ({ ...bin, label: bin.from === bin.to ? String(bin.from) : `${bin.from}–${bin.to}` }));
+  const format = (value) => Number(value.toFixed(3)).toLocaleString('it-IT');
+  return bins.map((bin) => ({ ...bin, label: bin.from === bin.to ? format(bin.from) : `${format(bin.from)}–${format(bin.to)}` }));
 }
 
 export function simulateLineup(starters, options = {}) {
-  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27' } = options;
+  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples, asOf = Date.now() } = options;
   const iterations = clamp(Math.trunc(Number(options.iterations) || 5000), 1, 30000);
   const maxSubstitutions = clamp(Math.trunc(Number(options.maxSubstitutions ?? 3) || 0), 0, 11);
-  const empty = { status: 'insufficient', mode, mean: null, p10: null, p50: null, p90: null, min: null, max: null, histogram: [], individual: [], excluded: [], coverage: 0, iterations: 0, seed, notes: [] };
+  const empty = { status: 'insufficient', mode, method: null, methods: {}, mean: null, p10: null, p50: null, p90: null, min: null, max: null, histogram: [], individual: [], excluded: [], coverage: 0, iterations: 0, seed, notes: [] };
   if (!['demo', 'real'].includes(mode) || dataset?.mode !== mode) {
     return { ...empty, notes: ['Seleziona un archivio compatibile con i giocatori da simulare.'] };
   }
@@ -379,22 +496,52 @@ export function simulateLineup(starters, options = {}) {
   }
 
   const ids = new Set();
-  const excluded = [];
   const entries = [...lineup.map((player) => ({ player, role: 'starter' })), ...reserves.map((player) => ({ player, role: 'reserve' }))].flatMap(({ player, role }) => {
     if (player?.id == null || ids.has(String(player.id))) return [];
     ids.add(String(player.id));
     const record = dataset.players?.find((item) => sameId(item.id, player.id)) ?? player;
-    const result = analyzePlayer(record, { dataset, round, mode });
-    const missingFixture = round != null && round !== '' && !result.fixture;
-    const analysis = missingFixture
-      ? { ...result, expectedPoints: null, notes: ['La squadra non ha una partita verificata per la giornata selezionata.'] }
-      : result;
-    if (analysis.expectedPoints == null) {
-      excluded.push({ id: record.id, name: record.name, role, reason: analysis.notes.join(' ') });
-    }
-    return [{ player: record, role, analysis, points: 0, appearances: 0, used: 0 }];
+    const fantasySample = fantasySamples instanceof Map ? fantasySamples.get(record.id)
+      : fantasySamples && Object.hasOwn(fantasySamples, record.id) ? fantasySamples[record.id] : null;
+    const analyze = (method) => {
+      const result = analyzePlayer(record, { dataset, round, mode, fantasySample, asOf, method });
+      if (round != null && round !== '' && !result.fixture && result.notes[0] !== 'Giocatore assente dall’archivio selezionato.') {
+        return { ...result, expectedPoints: null, notes: ['La squadra non ha una partita verificata per la giornata selezionata.'] };
+      }
+      return result;
+    };
+    const preferred = analyze();
+    return [{ player: record, role, analyze, preferred, analysis: preferred, points: 0, appearances: 0, used: 0 }];
   });
 
+  const starterEntries = entries.filter((entry) => entry.role === 'starter');
+  const completeEventBasis = mode === 'demo' || starterEntries.every((entry) =>
+    entry.preferred.expectedPoints != null && ['events', 'confirmed-out'].includes(entry.preferred.projection?.method));
+  let method = 'events';
+  if (!completeEventBasis) {
+    const best = METHODS.map((basis) => {
+      const analyses = entries.map((entry) => {
+        if (entry.preferred.projection?.method === basis || entry.preferred.unavailable) return entry.preferred;
+        return entry.analyze(basis);
+      });
+      const covered = analyses.filter((analysis, index) => entries[index].role === 'starter' && analysis.expectedPoints != null).length;
+      return { basis, analyses, covered };
+    }).sort((first, second) => second.covered - first.covered)[0];
+    method = best.basis;
+    entries.forEach((entry, index) => { entry.analysis = best.analyses[index]; });
+  } else {
+    for (const entry of entries) {
+      if (entry.preferred.expectedPoints != null && !['events', 'confirmed-out'].includes(entry.preferred.projection?.method)) {
+        entry.analysis = entry.analyze('events');
+      }
+    }
+  }
+
+  const excluded = entries.filter((entry) => entry.analysis.expectedPoints == null).map(({ player, role, analysis, preferred }) => ({
+    id: player.id, name: player.name, role,
+    reason: preferred.expectedPoints != null
+      ? 'È disponibile una stima su una base di punteggio diversa da quella usata per il totale.'
+      : (preferred.notes.length ? preferred.notes : analysis.notes).join(' '),
+  }));
   const eligibleStarters = entries.filter((entry) => entry.role === 'starter' && entry.analysis.expectedPoints != null);
   const eligibleReserves = entries.filter((entry) => entry.role === 'reserve' && entry.analysis.expectedPoints != null);
   const coverage = lineup.length ? eligibleStarters.length / lineup.length : 0;
@@ -440,20 +587,40 @@ export function simulateLineup(starters, options = {}) {
     id: entry.player.id,
     name: entry.player.name,
     role: entry.role,
+    method: entry.analysis.projection.method,
     mean: entry.points / iterations,
     appearanceProbability: entry.analysis.projection.appearanceProbability,
-    sampledAppearanceProbability: entry.appearances / iterations,
+    voteProbability: entry.analysis.projection.voteProbability ?? null,
+    sampledAppearanceProbability: entry.analysis.projection.appearanceProbability == null ? null : entry.appearances / iterations,
+    sampledVoteProbability: entry.analysis.projection.voteProbability == null ? null : entry.appearances / iterations,
     usedProbability: entry.used / iterations,
   }));
-  const notes = [
+  const methods = Object.create(null);
+  for (const row of individual) methods[row.method] = (methods[row.method] ?? 0) + 1;
+  const notes = method === 'events' ? [
     'Simulazione con eventi indipendenti tra giocatori. Gol, assist e gol subiti seguono distribuzioni di Poisson.',
     'Il modello assegna un voto base di 6 per ogni presenza simulata.',
-    `Sostituzioni nell’ordine della panchina e a parità di ruolo. Limite di ${maxSubstitutions} per simulazione.`,
+  ] : method === 'league-average' ? [
+    'Stima basata sull’Excel di lega. Ogni giocatore ha una probabilità di ricevere voto e ottiene la propria fantamedia quando riceve voto. Il file non misura la variabilità del singolo fantavoto.',
+  ] : [
+    'Stima basata sui fantavoti FantaTB pubblicati prima della partita. Ogni giocatore estrae un fantavoto osservato, oppure non riceve voto in base alle registrazioni disponibili.',
   ];
+  if (method !== 'events') {
+    const samples = [...eligibleStarters, ...eligibleReserves].flatMap((entry) => entry.analysis.projection.sample ?? []);
+    const rounds = [...new Set(samples.flatMap((sample) => sample.rounds ?? [sample.asOfRound]))].sort((a, b) => a - b);
+    if (rounds.length) {
+      const description = method === 'league-average'
+        ? `L’Excel di lega arriva alla giornata ${rounds.at(-1)}.`
+        : `La stima usa le registrazioni delle giornate ${rounds.join(', ')}.`;
+      notes.push(description);
+    }
+    notes.push('Il modello simula i giocatori in modo indipendente.');
+  }
+  notes.push(`Sostituzioni nell’ordine della panchina e a parità di ruolo. Limite di ${maxSubstitutions} per simulazione.`);
   if (excluded.length) notes.push('I giocatori con dati insufficienti sono esclusi. Le riserve subentrano solo per le assenze simulate dei titolari con dati sufficienti.');
   return {
     status: excluded.length || coverage < 1 ? 'partial' : 'simulated',
-    mode, mean: average(values), p10: quantile(0.1), p50: quantile(0.5), p90: quantile(0.9),
+    mode, method, methods: { ...methods }, mean: average(values), p10: quantile(0.1), p50: quantile(0.5), p90: quantile(0.9),
     min: values[0], max: values.at(-1), histogram: makeHistogram(values), individual, excluded, coverage, iterations, seed, notes,
   };
 }
