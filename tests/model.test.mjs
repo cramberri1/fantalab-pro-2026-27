@@ -8,7 +8,7 @@ const fixtures = Array.from({ length: 4 }, (_, index) => ({
   round: index + 1,
   homeId: 'a',
   awayId: 'c',
-  kickoff: `2026-09-${(index + 1) * 5}T18:45:00Z`,
+  kickoff: `2026-09-${String((index + 1) * 5).padStart(2, '0')}T18:45:00Z`,
   status: 'played',
   homeGoals: 1,
   awayGoals: 0,
@@ -78,4 +78,86 @@ test('formation validation counts unique players by role', () => {
   const invalid = validateLineup([...players.slice(0, -1), players[0]], '3-4-3');
   assert.equal(invalid.valid, false);
   assert.equal(invalid.missing.FWD, 1);
+});
+
+const predictionTime = '2026-09-29T18:45:00Z';
+const fantasyOnly = {
+  id: 'rated', name: 'Giocatore FantaTB', position: 'FWD', teamId: 'a',
+  ratings: [
+    { round: 1, rating: 6, fantasyRating: 5 },
+    { round: 2, rating: null, fantasyRating: null },
+    { round: 4, rating: 7, fantasyRating: 10 },
+    { round: 5, rating: 8, fantasyRating: 12 },
+  ],
+};
+const fantasyArchive = {
+  id: 'transferbeat-ratings', ambiguousRatings: 0,
+  archives: [1, 2, 3, 4, 5].map(round => ({ round, updatedAt: `2026-09-${String(round * 5 + 1).padStart(2, '0')}T18:45:00Z` })),
+};
+const realDataset = {
+  ...dataset, mode: 'real', sources: [fantasyArchive], players: [fantasyOnly],
+  teams: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+};
+
+test('uses only explicit historical votes available before the fixture and prediction time', () => {
+  const options = { dataset: realDataset, asOf: predictionTime, round: 5 };
+  const result = analyzePlayer(fantasyOnly, options);
+  assert.equal(result.projection.method, 'fantatb-history');
+  assert.deepEqual(result.projection.sample.rounds, [1, 2, 4]);
+  assert.equal(result.projection.sample.asOfDate, '2026-09-20');
+  assert.equal(result.projection.voteProbability, 2 / 3);
+  assert.equal(result.projection.appearanceProbability, null);
+  assert.equal(result.projection.expectedMinutes, null);
+  assert.equal(result.expectedPoints, 5);
+  assert.equal(result.index, null);
+  assert.equal(analyzePlayer(fantasyOnly, { ...options, asOf: '2026-09-19' }).expectedPoints, null);
+  assert.equal(analyzePlayer(fantasyOnly, { ...options, asOf: '2026-10-01' }).expectedPoints, null);
+  const ambiguous = { ...realDataset, sources: [{ ...fantasyArchive, ambiguousRatings: 1 }] };
+  assert.equal(analyzePlayer(fantasyOnly, { ...options, dataset: ambiguous }).expectedPoints, null);
+  const additionalVote = { ...fantasyOnly, ratings: [...fantasyOnly.ratings, { round: 3, rating: 6, fantasyRating: 6 }] };
+  const verified = analyzePlayer(additionalVote, { ...options, dataset: { ...ambiguous, players: [additionalVote] } });
+  assert.equal(verified.projection.voteProbability, 1);
+  assert.deepEqual(verified.projection.sample.rounds, [1, 3, 4]);
+});
+
+test('empirical simulation samples votes and historical scores reproducibly', () => {
+  const options = { dataset: realDataset, asOf: predictionTime, round: 5, iterations: 16000, seed: 'empirical' };
+  const run = simulateLineup([fantasyOnly], options);
+  assert.equal(run.method, 'fantatb-history');
+  assert.equal(run.coverage, 1);
+  assert.deepEqual(run.methods, { 'fantatb-history': 1 });
+  assert.ok(Math.abs(run.mean - 5) < 0.1);
+  assert.ok(Math.abs(run.individual[0].sampledVoteProbability - 2 / 3) < 0.02);
+  assert.equal(run.individual[0].sampledAppearanceProbability, null);
+  assert.equal(run.min, 0);
+  assert.equal(run.max, 10);
+  assert.deepEqual(run, simulateLineup([fantasyOnly], options));
+});
+
+test('private league samples cover local roster IDs and preserve one scoring basis per simulation', () => {
+  const local = { id: 'csv:a:FWD:locale', name: 'Giocatore locale', position: 'FWD', teamId: 'a' };
+  const league = { gamesWithVote: 3, fantasyAverage: 8, teamGames: 4, asOfRound: 4 };
+  const options = { dataset: realDataset, asOf: predictionTime, round: 5 };
+  const result = analyzePlayer(local, { ...options, fantasySample: league });
+  assert.equal(result.expectedPoints, 6);
+  assert.equal(result.projection.method, 'league-average');
+  assert.equal(result.projection.appearanceProbability, null);
+  assert.equal(analyzePlayer(local, { ...options, fantasySample: { ...league, teamGames: 5 } }).expectedPoints, null);
+  assert.equal(analyzePlayer(local, { ...options, fantasySample: { ...league, asOfRound: 3 } }).expectedPoints, null);
+  assert.equal(analyzePlayer(fantasyOnly, { ...options, fantasySample: league }).projection.method, 'fantatb-history');
+  const earlierArchive = { ...fantasyArchive, archives: fantasyArchive.archives.filter(item => item.round < 4) };
+  const earlier = { ...realDataset, sources: [earlierArchive] };
+  const earlierPlayer = { ...fantasyOnly, ratings: [...fantasyOnly.ratings, { round: 3, rating: 7, fantasyRating: 6 }] };
+  assert.equal(analyzePlayer(earlierPlayer, { ...options, dataset: { ...earlier, players: [earlierPlayer] }, fantasySample: league }).projection.method, 'league-average');
+  const mixed = simulateLineup([fantasyOnly, local], { ...options, fantasySamples: new Map([[local.id, league]]), iterations: 5000 });
+  assert.equal(mixed.method, 'league-average');
+  assert.equal(mixed.coverage, 0.5);
+  assert.equal(mixed.excluded[0].id, fantasyOnly.id);
+  assert.match(mixed.excluded[0].reason, /base di punteggio diversa/);
+  const leagueRun = simulateLineup([fantasyOnly, local], {
+    ...options, fantasySamples: { [local.id]: league, [fantasyOnly.id]: league }, iterations: 5000,
+  });
+  assert.equal(leagueRun.method, 'league-average');
+  assert.equal(leagueRun.coverage, 1);
+  assert.equal(leagueRun.max, 16);
 });
