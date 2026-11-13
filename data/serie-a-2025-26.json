@@ -1,0 +1,3446 @@
+{
+  "schemaVersion": 1,
+  "season": "2025/26",
+  "mode": "real",
+  "sources": [
+    {
+      "id": "openfootball-history",
+      "name": "OpenFootball",
+      "url": "https://raw.githubusercontent.com/openfootball/football.json/master/2025-26/it.1.json",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://github.com/openfootball/football.json/blob/master/LICENSE.md",
+      "contentSha256": "5b51400913d536eef4b1e5e68a4df913ed78ce336d461afd9e5dc310812322df"
+    }
+  ],
+  "coverage": {
+    "fixtures": "available",
+    "results": "available",
+    "playerStats": "missing",
+    "expectedGoals": "missing"
+  },
+  "teams": [
+    {
+      "id": "atalanta",
+      "name": "Atalanta BC",
+      "shortName": "Atalanta",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 51,
+        "goalsAgainst": 36,
+        "wins": 15,
+        "draws": 14,
+        "losses": 9,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 25,
+        "homeGoalsAgainst": 15,
+        "awayGoalsFor": 26,
+        "awayGoalsAgainst": 21
+      }
+    },
+    {
+      "id": "bologna",
+      "name": "Bologna FC 1909",
+      "shortName": "Bologna",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 49,
+        "goalsAgainst": 46,
+        "wins": 16,
+        "draws": 8,
+        "losses": 14,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 19,
+        "homeGoalsAgainst": 23,
+        "awayGoalsFor": 30,
+        "awayGoalsAgainst": 23
+      }
+    },
+    {
+      "id": "cagliari",
+      "name": "Cagliari Calcio",
+      "shortName": "Cagliari",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 40,
+        "goalsAgainst": 53,
+        "wins": 11,
+        "draws": 10,
+        "losses": 17,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 22,
+        "homeGoalsAgainst": 23,
+        "awayGoalsFor": 18,
+        "awayGoalsAgainst": 30
+      }
+    },
+    {
+      "id": "como",
+      "name": "Como 1907",
+      "shortName": "Como",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 65,
+        "goalsAgainst": 29,
+        "wins": 20,
+        "draws": 11,
+        "losses": 7,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 35,
+        "homeGoalsAgainst": 15,
+        "awayGoalsFor": 30,
+        "awayGoalsAgainst": 14
+      }
+    },
+    {
+      "id": "cremonese",
+      "name": "US Cremonese",
+      "shortName": "Cremonese",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 32,
+        "goalsAgainst": 57,
+        "wins": 8,
+        "draws": 10,
+        "losses": 20,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 18,
+        "homeGoalsAgainst": 29,
+        "awayGoalsFor": 14,
+        "awayGoalsAgainst": 28
+      }
+    },
+    {
+      "id": "fiorentina",
+      "name": "ACF Fiorentina",
+      "shortName": "Fiorentina",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 41,
+        "goalsAgainst": 50,
+        "wins": 9,
+        "draws": 15,
+        "losses": 14,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 21,
+        "homeGoalsAgainst": 21,
+        "awayGoalsFor": 20,
+        "awayGoalsAgainst": 29
+      }
+    },
+    {
+      "id": "genoa",
+      "name": "Genoa CFC",
+      "shortName": "Genoa",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 41,
+        "goalsAgainst": 51,
+        "wins": 10,
+        "draws": 11,
+        "losses": 17,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 22,
+        "homeGoalsAgainst": 26,
+        "awayGoalsFor": 19,
+        "awayGoalsAgainst": 25
+      }
+    },
+    {
+      "id": "inter",
+      "name": "FC Internazionale Milano",
+      "shortName": "Inter",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 89,
+        "goalsAgainst": 35,
+        "wins": 27,
+        "draws": 6,
+        "losses": 5,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 50,
+        "homeGoalsAgainst": 16,
+        "awayGoalsFor": 39,
+        "awayGoalsAgainst": 19
+      }
+    },
+    {
+      "id": "juventus",
+      "name": "Juventus FC",
+      "shortName": "Juventus",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 61,
+        "goalsAgainst": 34,
+        "wins": 19,
+        "draws": 12,
+        "losses": 7,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 35,
+        "homeGoalsAgainst": 16,
+        "awayGoalsFor": 26,
+        "awayGoalsAgainst": 18
+      }
+    },
+    {
+      "id": "lazio",
+      "name": "SS Lazio",
+      "shortName": "Lazio",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 41,
+        "goalsAgainst": 40,
+        "wins": 14,
+        "draws": 12,
+        "losses": 12,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 27,
+        "homeGoalsAgainst": 25,
+        "awayGoalsFor": 14,
+        "awayGoalsAgainst": 15
+      }
+    },
+    {
+      "id": "lecce",
+      "name": "US Lecce",
+      "shortName": "Lecce",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 28,
+        "goalsAgainst": 50,
+        "wins": 10,
+        "draws": 8,
+        "losses": 20,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 13,
+        "homeGoalsAgainst": 24,
+        "awayGoalsFor": 15,
+        "awayGoalsAgainst": 26
+      }
+    },
+    {
+      "id": "milan",
+      "name": "AC Milan",
+      "shortName": "Milan",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 53,
+        "goalsAgainst": 35,
+        "wins": 20,
+        "draws": 10,
+        "losses": 8,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 25,
+        "homeGoalsAgainst": 21,
+        "awayGoalsFor": 28,
+        "awayGoalsAgainst": 14
+      }
+    },
+    {
+      "id": "napoli",
+      "name": "SSC Napoli",
+      "shortName": "Napoli",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 58,
+        "goalsAgainst": 36,
+        "wins": 23,
+        "draws": 7,
+        "losses": 8,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 33,
+        "homeGoalsAgainst": 18,
+        "awayGoalsFor": 25,
+        "awayGoalsAgainst": 18
+      }
+    },
+    {
+      "id": "parma",
+      "name": "Parma Calcio 1913",
+      "shortName": "Parma",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 28,
+        "goalsAgainst": 46,
+        "wins": 11,
+        "draws": 12,
+        "losses": 15,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 16,
+        "homeGoalsAgainst": 25,
+        "awayGoalsFor": 12,
+        "awayGoalsAgainst": 21
+      }
+    },
+    {
+      "id": "pisa",
+      "name": "AC Pisa 1909",
+      "shortName": "Pisa",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 26,
+        "goalsAgainst": 71,
+        "wins": 2,
+        "draws": 12,
+        "losses": 24,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 9,
+        "homeGoalsAgainst": 26,
+        "awayGoalsFor": 17,
+        "awayGoalsAgainst": 45
+      }
+    },
+    {
+      "id": "roma",
+      "name": "AS Roma",
+      "shortName": "Roma",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 59,
+        "goalsAgainst": 31,
+        "wins": 23,
+        "draws": 4,
+        "losses": 11,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 33,
+        "homeGoalsAgainst": 10,
+        "awayGoalsFor": 26,
+        "awayGoalsAgainst": 21
+      }
+    },
+    {
+      "id": "sassuolo",
+      "name": "US Sassuolo Calcio",
+      "shortName": "Sassuolo",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 46,
+        "goalsAgainst": 50,
+        "wins": 14,
+        "draws": 7,
+        "losses": 17,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 25,
+        "homeGoalsAgainst": 26,
+        "awayGoalsFor": 21,
+        "awayGoalsAgainst": 24
+      }
+    },
+    {
+      "id": "torino",
+      "name": "Torino FC",
+      "shortName": "Torino",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 44,
+        "goalsAgainst": 63,
+        "wins": 12,
+        "draws": 9,
+        "losses": 17,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 27,
+        "homeGoalsAgainst": 29,
+        "awayGoalsFor": 17,
+        "awayGoalsAgainst": 34
+      }
+    },
+    {
+      "id": "udinese",
+      "name": "Udinese Calcio",
+      "shortName": "Udinese",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 45,
+        "goalsAgainst": 48,
+        "wins": 14,
+        "draws": 8,
+        "losses": 16,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 18,
+        "homeGoalsAgainst": 21,
+        "awayGoalsFor": 27,
+        "awayGoalsAgainst": 27
+      }
+    },
+    {
+      "id": "verona",
+      "name": "Hellas Verona FC",
+      "shortName": "Verona",
+      "stats": {
+        "matches": 38,
+        "goalsFor": 25,
+        "goalsAgainst": 61,
+        "wins": 3,
+        "draws": 12,
+        "losses": 23,
+        "homeMatches": 19,
+        "awayMatches": 19,
+        "homeGoalsFor": 12,
+        "homeGoalsAgainst": 28,
+        "awayGoalsFor": 13,
+        "awayGoalsAgainst": 33
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "round": 1,
+      "date": "2025-08-23",
+      "homeId": "genoa",
+      "awayId": "lecce",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 1,
+      "date": "2025-08-23",
+      "homeId": "milan",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 1,
+      "date": "2025-08-23",
+      "homeId": "roma",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 1,
+      "date": "2025-08-23",
+      "homeId": "sassuolo",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 1,
+      "date": "2025-08-24",
+      "homeId": "atalanta",
+      "awayId": "pisa",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 1,
+      "date": "2025-08-24",
+      "homeId": "cagliari",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 1,
+      "date": "2025-08-24",
+      "homeId": "como",
+      "awayId": "lazio",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 1,
+      "date": "2025-08-24",
+      "homeId": "juventus",
+      "awayId": "parma",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 1,
+      "date": "2025-08-25",
+      "homeId": "inter",
+      "awayId": "torino",
+      "homeGoals": 5,
+      "awayGoals": 0
+    },
+    {
+      "round": 1,
+      "date": "2025-08-25",
+      "homeId": "udinese",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 2,
+      "date": "2025-08-29",
+      "homeId": "cremonese",
+      "awayId": "sassuolo",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 2,
+      "date": "2025-08-29",
+      "homeId": "lecce",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 2,
+      "date": "2025-08-30",
+      "homeId": "bologna",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 2,
+      "date": "2025-08-30",
+      "homeId": "napoli",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 2,
+      "date": "2025-08-30",
+      "homeId": "parma",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 2,
+      "date": "2025-08-30",
+      "homeId": "pisa",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 2,
+      "date": "2025-08-31",
+      "homeId": "genoa",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 2,
+      "date": "2025-08-31",
+      "homeId": "inter",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 2,
+      "date": "2025-08-31",
+      "homeId": "lazio",
+      "awayId": "verona",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 2,
+      "date": "2025-08-31",
+      "homeId": "torino",
+      "awayId": "fiorentina",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 3,
+      "date": "2025-09-13",
+      "homeId": "cagliari",
+      "awayId": "parma",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 3,
+      "date": "2025-09-13",
+      "homeId": "fiorentina",
+      "awayId": "napoli",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 3,
+      "date": "2025-09-13",
+      "homeId": "juventus",
+      "awayId": "inter",
+      "homeGoals": 4,
+      "awayGoals": 3
+    },
+    {
+      "round": 3,
+      "date": "2025-09-14",
+      "homeId": "atalanta",
+      "awayId": "lecce",
+      "homeGoals": 4,
+      "awayGoals": 1
+    },
+    {
+      "round": 3,
+      "date": "2025-09-14",
+      "homeId": "milan",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 3,
+      "date": "2025-09-14",
+      "homeId": "pisa",
+      "awayId": "udinese",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 3,
+      "date": "2025-09-14",
+      "homeId": "roma",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 3,
+      "date": "2025-09-14",
+      "homeId": "sassuolo",
+      "awayId": "lazio",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 3,
+      "date": "2025-09-15",
+      "homeId": "como",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 3,
+      "date": "2025-09-15",
+      "homeId": "verona",
+      "awayId": "cremonese",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 4,
+      "date": "2025-09-19",
+      "homeId": "lecce",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 4,
+      "date": "2025-09-20",
+      "homeId": "bologna",
+      "awayId": "genoa",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 4,
+      "date": "2025-09-20",
+      "homeId": "udinese",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 4,
+      "date": "2025-09-20",
+      "homeId": "verona",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 4,
+      "date": "2025-09-21",
+      "homeId": "cremonese",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 4,
+      "date": "2025-09-21",
+      "homeId": "fiorentina",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 4,
+      "date": "2025-09-21",
+      "homeId": "inter",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 4,
+      "date": "2025-09-21",
+      "homeId": "lazio",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 4,
+      "date": "2025-09-21",
+      "homeId": "torino",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 4,
+      "date": "2025-09-22",
+      "homeId": "napoli",
+      "awayId": "pisa",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 5,
+      "date": "2025-09-27",
+      "homeId": "cagliari",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 5,
+      "date": "2025-09-27",
+      "homeId": "como",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 5,
+      "date": "2025-09-27",
+      "homeId": "juventus",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 5,
+      "date": "2025-09-28",
+      "homeId": "lecce",
+      "awayId": "bologna",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 5,
+      "date": "2025-09-28",
+      "homeId": "milan",
+      "awayId": "napoli",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 5,
+      "date": "2025-09-28",
+      "homeId": "pisa",
+      "awayId": "fiorentina",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 5,
+      "date": "2025-09-28",
+      "homeId": "roma",
+      "awayId": "verona",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 5,
+      "date": "2025-09-28",
+      "homeId": "sassuolo",
+      "awayId": "udinese",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 5,
+      "date": "2025-09-29",
+      "homeId": "genoa",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 5,
+      "date": "2025-09-29",
+      "homeId": "parma",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-03",
+      "homeId": "verona",
+      "awayId": "sassuolo",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-04",
+      "homeId": "atalanta",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-04",
+      "homeId": "inter",
+      "awayId": "cremonese",
+      "homeGoals": 4,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-04",
+      "homeId": "lazio",
+      "awayId": "torino",
+      "homeGoals": 3,
+      "awayGoals": 3
+    },
+    {
+      "round": 6,
+      "date": "2025-10-04",
+      "homeId": "parma",
+      "awayId": "lecce",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-05",
+      "homeId": "bologna",
+      "awayId": "pisa",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 6,
+      "date": "2025-10-05",
+      "homeId": "fiorentina",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 6,
+      "date": "2025-10-05",
+      "homeId": "juventus",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 6,
+      "date": "2025-10-05",
+      "homeId": "napoli",
+      "awayId": "genoa",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 6,
+      "date": "2025-10-05",
+      "homeId": "udinese",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 7,
+      "date": "2025-10-18",
+      "homeId": "lecce",
+      "awayId": "sassuolo",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-18",
+      "homeId": "pisa",
+      "awayId": "verona",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-18",
+      "homeId": "roma",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 7,
+      "date": "2025-10-18",
+      "homeId": "torino",
+      "awayId": "napoli",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-19",
+      "homeId": "atalanta",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-19",
+      "homeId": "cagliari",
+      "awayId": "bologna",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 7,
+      "date": "2025-10-19",
+      "homeId": "como",
+      "awayId": "juventus",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-19",
+      "homeId": "genoa",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 7,
+      "date": "2025-10-19",
+      "homeId": "milan",
+      "awayId": "fiorentina",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 7,
+      "date": "2025-10-20",
+      "homeId": "cremonese",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 8,
+      "date": "2025-10-24",
+      "homeId": "milan",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 8,
+      "date": "2025-10-25",
+      "homeId": "cremonese",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 8,
+      "date": "2025-10-25",
+      "homeId": "napoli",
+      "awayId": "inter",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 8,
+      "date": "2025-10-25",
+      "homeId": "parma",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 8,
+      "date": "2025-10-25",
+      "homeId": "udinese",
+      "awayId": "lecce",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 8,
+      "date": "2025-10-26",
+      "homeId": "fiorentina",
+      "awayId": "bologna",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 8,
+      "date": "2025-10-26",
+      "homeId": "lazio",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 8,
+      "date": "2025-10-26",
+      "homeId": "sassuolo",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 8,
+      "date": "2025-10-26",
+      "homeId": "torino",
+      "awayId": "genoa",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 8,
+      "date": "2025-10-26",
+      "homeId": "verona",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 9,
+      "date": "2025-10-28",
+      "homeId": "atalanta",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 9,
+      "date": "2025-10-28",
+      "homeId": "lecce",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "bologna",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "como",
+      "awayId": "verona",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "genoa",
+      "awayId": "cremonese",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "inter",
+      "awayId": "fiorentina",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "juventus",
+      "awayId": "udinese",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 9,
+      "date": "2025-10-29",
+      "homeId": "roma",
+      "awayId": "parma",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 9,
+      "date": "2025-10-30",
+      "homeId": "cagliari",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 9,
+      "date": "2025-10-30",
+      "homeId": "pisa",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 10,
+      "date": "2025-11-01",
+      "homeId": "cremonese",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 10,
+      "date": "2025-11-01",
+      "homeId": "napoli",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 10,
+      "date": "2025-11-01",
+      "homeId": "udinese",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 10,
+      "date": "2025-11-02",
+      "homeId": "fiorentina",
+      "awayId": "lecce",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 10,
+      "date": "2025-11-02",
+      "homeId": "milan",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 10,
+      "date": "2025-11-02",
+      "homeId": "parma",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 10,
+      "date": "2025-11-02",
+      "homeId": "torino",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 10,
+      "date": "2025-11-02",
+      "homeId": "verona",
+      "awayId": "inter",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 10,
+      "date": "2025-11-03",
+      "homeId": "lazio",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 10,
+      "date": "2025-11-03",
+      "homeId": "sassuolo",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 11,
+      "date": "2025-11-07",
+      "homeId": "pisa",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-08",
+      "homeId": "como",
+      "awayId": "cagliari",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-08",
+      "homeId": "juventus",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-08",
+      "homeId": "lecce",
+      "awayId": "verona",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-08",
+      "homeId": "parma",
+      "awayId": "milan",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 11,
+      "date": "2025-11-09",
+      "homeId": "atalanta",
+      "awayId": "sassuolo",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 11,
+      "date": "2025-11-09",
+      "homeId": "bologna",
+      "awayId": "napoli",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-09",
+      "homeId": "genoa",
+      "awayId": "fiorentina",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 11,
+      "date": "2025-11-09",
+      "homeId": "inter",
+      "awayId": "lazio",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 11,
+      "date": "2025-11-09",
+      "homeId": "roma",
+      "awayId": "udinese",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 12,
+      "date": "2025-11-22",
+      "homeId": "cagliari",
+      "awayId": "genoa",
+      "homeGoals": 3,
+      "awayGoals": 3
+    },
+    {
+      "round": 12,
+      "date": "2025-11-22",
+      "homeId": "fiorentina",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 12,
+      "date": "2025-11-22",
+      "homeId": "napoli",
+      "awayId": "atalanta",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 12,
+      "date": "2025-11-22",
+      "homeId": "udinese",
+      "awayId": "bologna",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 12,
+      "date": "2025-11-23",
+      "homeId": "cremonese",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 12,
+      "date": "2025-11-23",
+      "homeId": "inter",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 12,
+      "date": "2025-11-23",
+      "homeId": "lazio",
+      "awayId": "lecce",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 12,
+      "date": "2025-11-23",
+      "homeId": "verona",
+      "awayId": "parma",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 12,
+      "date": "2025-11-24",
+      "homeId": "sassuolo",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 12,
+      "date": "2025-11-24",
+      "homeId": "torino",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 5
+    },
+    {
+      "round": 13,
+      "date": "2025-11-28",
+      "homeId": "como",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 13,
+      "date": "2025-11-29",
+      "homeId": "genoa",
+      "awayId": "verona",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 13,
+      "date": "2025-11-29",
+      "homeId": "juventus",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 13,
+      "date": "2025-11-29",
+      "homeId": "milan",
+      "awayId": "lazio",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 13,
+      "date": "2025-11-29",
+      "homeId": "parma",
+      "awayId": "udinese",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 13,
+      "date": "2025-11-30",
+      "homeId": "atalanta",
+      "awayId": "fiorentina",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 13,
+      "date": "2025-11-30",
+      "homeId": "lecce",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 13,
+      "date": "2025-11-30",
+      "homeId": "pisa",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 13,
+      "date": "2025-11-30",
+      "homeId": "roma",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 13,
+      "date": "2025-12-01",
+      "homeId": "bologna",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 14,
+      "date": "2025-12-06",
+      "homeId": "inter",
+      "awayId": "como",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 14,
+      "date": "2025-12-06",
+      "homeId": "sassuolo",
+      "awayId": "fiorentina",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 14,
+      "date": "2025-12-06",
+      "homeId": "verona",
+      "awayId": "atalanta",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 14,
+      "date": "2025-12-07",
+      "homeId": "cagliari",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 14,
+      "date": "2025-12-07",
+      "homeId": "cremonese",
+      "awayId": "lecce",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 14,
+      "date": "2025-12-07",
+      "homeId": "lazio",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 14,
+      "date": "2025-12-07",
+      "homeId": "napoli",
+      "awayId": "juventus",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 14,
+      "date": "2025-12-08",
+      "homeId": "pisa",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 14,
+      "date": "2025-12-08",
+      "homeId": "torino",
+      "awayId": "milan",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 14,
+      "date": "2025-12-08",
+      "homeId": "udinese",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 15,
+      "date": "2025-12-12",
+      "homeId": "lecce",
+      "awayId": "pisa",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 15,
+      "date": "2025-12-13",
+      "homeId": "atalanta",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 15,
+      "date": "2025-12-13",
+      "homeId": "parma",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 15,
+      "date": "2025-12-13",
+      "homeId": "torino",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 15,
+      "date": "2025-12-14",
+      "homeId": "bologna",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 15,
+      "date": "2025-12-14",
+      "homeId": "fiorentina",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 15,
+      "date": "2025-12-14",
+      "homeId": "genoa",
+      "awayId": "inter",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 15,
+      "date": "2025-12-14",
+      "homeId": "milan",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 15,
+      "date": "2025-12-14",
+      "homeId": "udinese",
+      "awayId": "napoli",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 15,
+      "date": "2025-12-15",
+      "homeId": "roma",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 16,
+      "date": "2025-12-20",
+      "homeId": "juventus",
+      "awayId": "roma",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 16,
+      "date": "2025-12-20",
+      "homeId": "lazio",
+      "awayId": "cremonese",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 16,
+      "date": "2025-12-21",
+      "homeId": "cagliari",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 16,
+      "date": "2025-12-21",
+      "homeId": "fiorentina",
+      "awayId": "udinese",
+      "homeGoals": 5,
+      "awayGoals": 1
+    },
+    {
+      "round": 16,
+      "date": "2025-12-21",
+      "homeId": "genoa",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 16,
+      "date": "2025-12-21",
+      "homeId": "sassuolo",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 17,
+      "date": "2025-12-27",
+      "homeId": "lecce",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 17,
+      "date": "2025-12-27",
+      "homeId": "parma",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 17,
+      "date": "2025-12-27",
+      "homeId": "pisa",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 17,
+      "date": "2025-12-27",
+      "homeId": "torino",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 17,
+      "date": "2025-12-27",
+      "homeId": "udinese",
+      "awayId": "lazio",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 17,
+      "date": "2025-12-28",
+      "homeId": "atalanta",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 17,
+      "date": "2025-12-28",
+      "homeId": "bologna",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 17,
+      "date": "2025-12-28",
+      "homeId": "cremonese",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 17,
+      "date": "2025-12-28",
+      "homeId": "milan",
+      "awayId": "verona",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 17,
+      "date": "2025-12-29",
+      "homeId": "roma",
+      "awayId": "genoa",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-02",
+      "homeId": "cagliari",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-03",
+      "homeId": "atalanta",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 18,
+      "date": "2026-01-03",
+      "homeId": "como",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 18,
+      "date": "2026-01-03",
+      "homeId": "genoa",
+      "awayId": "pisa",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-03",
+      "homeId": "juventus",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-03",
+      "homeId": "sassuolo",
+      "awayId": "parma",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-04",
+      "homeId": "fiorentina",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 18,
+      "date": "2026-01-04",
+      "homeId": "inter",
+      "awayId": "bologna",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 18,
+      "date": "2026-01-04",
+      "homeId": "lazio",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 18,
+      "date": "2026-01-04",
+      "homeId": "verona",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 19,
+      "date": "2026-01-06",
+      "homeId": "lecce",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-06",
+      "homeId": "pisa",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 19,
+      "date": "2026-01-06",
+      "homeId": "sassuolo",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 19,
+      "date": "2026-01-07",
+      "homeId": "bologna",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-07",
+      "homeId": "lazio",
+      "awayId": "fiorentina",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-07",
+      "homeId": "napoli",
+      "awayId": "verona",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-07",
+      "homeId": "parma",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-07",
+      "homeId": "torino",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-08",
+      "homeId": "cremonese",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 19,
+      "date": "2026-01-08",
+      "homeId": "milan",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 20,
+      "date": "2026-01-10",
+      "homeId": "atalanta",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 20,
+      "date": "2026-01-10",
+      "homeId": "como",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 20,
+      "date": "2026-01-10",
+      "homeId": "roma",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 20,
+      "date": "2026-01-10",
+      "homeId": "udinese",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 20,
+      "date": "2026-01-11",
+      "homeId": "fiorentina",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 20,
+      "date": "2026-01-11",
+      "homeId": "inter",
+      "awayId": "napoli",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 20,
+      "date": "2026-01-11",
+      "homeId": "lecce",
+      "awayId": "parma",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 20,
+      "date": "2026-01-11",
+      "homeId": "verona",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 20,
+      "date": "2026-01-12",
+      "homeId": "genoa",
+      "awayId": "cagliari",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 20,
+      "date": "2026-01-12",
+      "homeId": "juventus",
+      "awayId": "cremonese",
+      "homeGoals": 5,
+      "awayGoals": 0
+    },
+    {
+      "round": 16,
+      "date": "2026-01-14",
+      "homeId": "inter",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 16,
+      "date": "2026-01-14",
+      "homeId": "napoli",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 16,
+      "date": "2026-01-15",
+      "homeId": "como",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 16,
+      "date": "2026-01-15",
+      "homeId": "verona",
+      "awayId": "bologna",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 21,
+      "date": "2026-01-16",
+      "homeId": "pisa",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 21,
+      "date": "2026-01-17",
+      "homeId": "cagliari",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 21,
+      "date": "2026-01-17",
+      "homeId": "napoli",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 21,
+      "date": "2026-01-17",
+      "homeId": "udinese",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 21,
+      "date": "2026-01-18",
+      "homeId": "bologna",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 21,
+      "date": "2026-01-18",
+      "homeId": "milan",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 21,
+      "date": "2026-01-18",
+      "homeId": "parma",
+      "awayId": "genoa",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 21,
+      "date": "2026-01-18",
+      "homeId": "torino",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 21,
+      "date": "2026-01-19",
+      "homeId": "cremonese",
+      "awayId": "verona",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 21,
+      "date": "2026-01-19",
+      "homeId": "lazio",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 22,
+      "date": "2026-01-23",
+      "homeId": "inter",
+      "awayId": "pisa",
+      "homeGoals": 6,
+      "awayGoals": 2
+    },
+    {
+      "round": 22,
+      "date": "2026-01-24",
+      "homeId": "como",
+      "awayId": "torino",
+      "homeGoals": 6,
+      "awayGoals": 0
+    },
+    {
+      "round": 22,
+      "date": "2026-01-24",
+      "homeId": "fiorentina",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 22,
+      "date": "2026-01-24",
+      "homeId": "lecce",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 22,
+      "date": "2026-01-25",
+      "homeId": "atalanta",
+      "awayId": "parma",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 22,
+      "date": "2026-01-25",
+      "homeId": "genoa",
+      "awayId": "bologna",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 22,
+      "date": "2026-01-25",
+      "homeId": "juventus",
+      "awayId": "napoli",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 22,
+      "date": "2026-01-25",
+      "homeId": "roma",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 22,
+      "date": "2026-01-25",
+      "homeId": "sassuolo",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 22,
+      "date": "2026-01-26",
+      "homeId": "verona",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 23,
+      "date": "2026-01-30",
+      "homeId": "lazio",
+      "awayId": "genoa",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 23,
+      "date": "2026-01-31",
+      "homeId": "cagliari",
+      "awayId": "verona",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 23,
+      "date": "2026-01-31",
+      "homeId": "napoli",
+      "awayId": "fiorentina",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 23,
+      "date": "2026-01-31",
+      "homeId": "pisa",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 3
+    },
+    {
+      "round": 23,
+      "date": "2026-02-01",
+      "homeId": "como",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 23,
+      "date": "2026-02-01",
+      "homeId": "cremonese",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 23,
+      "date": "2026-02-01",
+      "homeId": "parma",
+      "awayId": "juventus",
+      "homeGoals": 1,
+      "awayGoals": 4
+    },
+    {
+      "round": 23,
+      "date": "2026-02-01",
+      "homeId": "torino",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 23,
+      "date": "2026-02-02",
+      "homeId": "udinese",
+      "awayId": "roma",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 23,
+      "date": "2026-02-03",
+      "homeId": "bologna",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 24,
+      "date": "2026-02-06",
+      "homeId": "verona",
+      "awayId": "pisa",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 24,
+      "date": "2026-02-07",
+      "homeId": "fiorentina",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 24,
+      "date": "2026-02-07",
+      "homeId": "genoa",
+      "awayId": "napoli",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 24,
+      "date": "2026-02-08",
+      "homeId": "bologna",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 24,
+      "date": "2026-02-08",
+      "homeId": "juventus",
+      "awayId": "lazio",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 24,
+      "date": "2026-02-08",
+      "homeId": "lecce",
+      "awayId": "udinese",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 24,
+      "date": "2026-02-08",
+      "homeId": "sassuolo",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 5
+    },
+    {
+      "round": 24,
+      "date": "2026-02-09",
+      "homeId": "atalanta",
+      "awayId": "cremonese",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 24,
+      "date": "2026-02-09",
+      "homeId": "roma",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 25,
+      "date": "2026-02-13",
+      "homeId": "pisa",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-14",
+      "homeId": "como",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-14",
+      "homeId": "inter",
+      "awayId": "juventus",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-14",
+      "homeId": "lazio",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-15",
+      "homeId": "cremonese",
+      "awayId": "genoa",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 25,
+      "date": "2026-02-15",
+      "homeId": "napoli",
+      "awayId": "roma",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-15",
+      "homeId": "parma",
+      "awayId": "verona",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 25,
+      "date": "2026-02-15",
+      "homeId": "torino",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-15",
+      "homeId": "udinese",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 25,
+      "date": "2026-02-16",
+      "homeId": "cagliari",
+      "awayId": "lecce",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 24,
+      "date": "2026-02-18",
+      "homeId": "milan",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 26,
+      "date": "2026-02-20",
+      "homeId": "sassuolo",
+      "awayId": "verona",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 26,
+      "date": "2026-02-21",
+      "homeId": "cagliari",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 26,
+      "date": "2026-02-21",
+      "homeId": "juventus",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 26,
+      "date": "2026-02-21",
+      "homeId": "lecce",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 26,
+      "date": "2026-02-22",
+      "homeId": "atalanta",
+      "awayId": "napoli",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 26,
+      "date": "2026-02-22",
+      "homeId": "genoa",
+      "awayId": "torino",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 26,
+      "date": "2026-02-22",
+      "homeId": "milan",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 26,
+      "date": "2026-02-22",
+      "homeId": "roma",
+      "awayId": "cremonese",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 26,
+      "date": "2026-02-23",
+      "homeId": "bologna",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 26,
+      "date": "2026-02-23",
+      "homeId": "fiorentina",
+      "awayId": "pisa",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 27,
+      "date": "2026-02-27",
+      "homeId": "parma",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 27,
+      "date": "2026-02-28",
+      "homeId": "como",
+      "awayId": "lecce",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 27,
+      "date": "2026-02-28",
+      "homeId": "inter",
+      "awayId": "genoa",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 27,
+      "date": "2026-02-28",
+      "homeId": "verona",
+      "awayId": "napoli",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 27,
+      "date": "2026-03-01",
+      "homeId": "cremonese",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 27,
+      "date": "2026-03-01",
+      "homeId": "roma",
+      "awayId": "juventus",
+      "homeGoals": 3,
+      "awayGoals": 3
+    },
+    {
+      "round": 27,
+      "date": "2026-03-01",
+      "homeId": "sassuolo",
+      "awayId": "atalanta",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 27,
+      "date": "2026-03-01",
+      "homeId": "torino",
+      "awayId": "lazio",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 27,
+      "date": "2026-03-02",
+      "homeId": "pisa",
+      "awayId": "bologna",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 27,
+      "date": "2026-03-02",
+      "homeId": "udinese",
+      "awayId": "fiorentina",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 28,
+      "date": "2026-03-06",
+      "homeId": "napoli",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 28,
+      "date": "2026-03-07",
+      "homeId": "atalanta",
+      "awayId": "udinese",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 28,
+      "date": "2026-03-07",
+      "homeId": "cagliari",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 28,
+      "date": "2026-03-07",
+      "homeId": "juventus",
+      "awayId": "pisa",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 28,
+      "date": "2026-03-08",
+      "homeId": "bologna",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 28,
+      "date": "2026-03-08",
+      "homeId": "fiorentina",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 28,
+      "date": "2026-03-08",
+      "homeId": "genoa",
+      "awayId": "roma",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 28,
+      "date": "2026-03-08",
+      "homeId": "lecce",
+      "awayId": "cremonese",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 28,
+      "date": "2026-03-08",
+      "homeId": "milan",
+      "awayId": "inter",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 28,
+      "date": "2026-03-09",
+      "homeId": "lazio",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-13",
+      "homeId": "torino",
+      "awayId": "parma",
+      "homeGoals": 4,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-14",
+      "homeId": "inter",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-14",
+      "homeId": "napoli",
+      "awayId": "lecce",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-14",
+      "homeId": "udinese",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-15",
+      "homeId": "como",
+      "awayId": "roma",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-15",
+      "homeId": "lazio",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 29,
+      "date": "2026-03-15",
+      "homeId": "pisa",
+      "awayId": "cagliari",
+      "homeGoals": 3,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-15",
+      "homeId": "sassuolo",
+      "awayId": "bologna",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 29,
+      "date": "2026-03-15",
+      "homeId": "verona",
+      "awayId": "genoa",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 29,
+      "date": "2026-03-16",
+      "homeId": "cremonese",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 4
+    },
+    {
+      "round": 30,
+      "date": "2026-03-20",
+      "homeId": "cagliari",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 30,
+      "date": "2026-03-20",
+      "homeId": "genoa",
+      "awayId": "udinese",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 30,
+      "date": "2026-03-21",
+      "homeId": "juventus",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 30,
+      "date": "2026-03-21",
+      "homeId": "milan",
+      "awayId": "torino",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 30,
+      "date": "2026-03-21",
+      "homeId": "parma",
+      "awayId": "cremonese",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 30,
+      "date": "2026-03-22",
+      "homeId": "atalanta",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 30,
+      "date": "2026-03-22",
+      "homeId": "bologna",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 30,
+      "date": "2026-03-22",
+      "homeId": "como",
+      "awayId": "pisa",
+      "homeGoals": 5,
+      "awayGoals": 0
+    },
+    {
+      "round": 30,
+      "date": "2026-03-22",
+      "homeId": "fiorentina",
+      "awayId": "inter",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 30,
+      "date": "2026-03-22",
+      "homeId": "roma",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 31,
+      "date": "2026-04-04",
+      "homeId": "lazio",
+      "awayId": "parma",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 31,
+      "date": "2026-04-04",
+      "homeId": "sassuolo",
+      "awayId": "cagliari",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 31,
+      "date": "2026-04-04",
+      "homeId": "verona",
+      "awayId": "fiorentina",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 31,
+      "date": "2026-04-05",
+      "homeId": "cremonese",
+      "awayId": "bologna",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 31,
+      "date": "2026-04-05",
+      "homeId": "inter",
+      "awayId": "roma",
+      "homeGoals": 5,
+      "awayGoals": 2
+    },
+    {
+      "round": 31,
+      "date": "2026-04-05",
+      "homeId": "pisa",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 31,
+      "date": "2026-04-06",
+      "homeId": "juventus",
+      "awayId": "genoa",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 31,
+      "date": "2026-04-06",
+      "homeId": "lecce",
+      "awayId": "atalanta",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 31,
+      "date": "2026-04-06",
+      "homeId": "napoli",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 31,
+      "date": "2026-04-06",
+      "homeId": "udinese",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 32,
+      "date": "2026-04-10",
+      "homeId": "roma",
+      "awayId": "pisa",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 32,
+      "date": "2026-04-11",
+      "homeId": "atalanta",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 32,
+      "date": "2026-04-11",
+      "homeId": "cagliari",
+      "awayId": "cremonese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 32,
+      "date": "2026-04-11",
+      "homeId": "milan",
+      "awayId": "udinese",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 32,
+      "date": "2026-04-11",
+      "homeId": "torino",
+      "awayId": "verona",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 32,
+      "date": "2026-04-12",
+      "homeId": "bologna",
+      "awayId": "lecce",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 32,
+      "date": "2026-04-12",
+      "homeId": "como",
+      "awayId": "inter",
+      "homeGoals": 3,
+      "awayGoals": 4
+    },
+    {
+      "round": 32,
+      "date": "2026-04-12",
+      "homeId": "genoa",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 32,
+      "date": "2026-04-12",
+      "homeId": "parma",
+      "awayId": "napoli",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 32,
+      "date": "2026-04-13",
+      "homeId": "fiorentina",
+      "awayId": "lazio",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 33,
+      "date": "2026-04-17",
+      "homeId": "inter",
+      "awayId": "cagliari",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 33,
+      "date": "2026-04-17",
+      "homeId": "sassuolo",
+      "awayId": "como",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 33,
+      "date": "2026-04-18",
+      "homeId": "napoli",
+      "awayId": "lazio",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 33,
+      "date": "2026-04-18",
+      "homeId": "roma",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 33,
+      "date": "2026-04-18",
+      "homeId": "udinese",
+      "awayId": "parma",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 33,
+      "date": "2026-04-19",
+      "homeId": "cremonese",
+      "awayId": "torino",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 33,
+      "date": "2026-04-19",
+      "homeId": "juventus",
+      "awayId": "bologna",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 33,
+      "date": "2026-04-19",
+      "homeId": "pisa",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 33,
+      "date": "2026-04-19",
+      "homeId": "verona",
+      "awayId": "milan",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 33,
+      "date": "2026-04-20",
+      "homeId": "lecce",
+      "awayId": "fiorentina",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 34,
+      "date": "2026-04-24",
+      "homeId": "napoli",
+      "awayId": "cremonese",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 34,
+      "date": "2026-04-25",
+      "homeId": "bologna",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 34,
+      "date": "2026-04-25",
+      "homeId": "parma",
+      "awayId": "pisa",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 34,
+      "date": "2026-04-25",
+      "homeId": "verona",
+      "awayId": "lecce",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 34,
+      "date": "2026-04-26",
+      "homeId": "fiorentina",
+      "awayId": "sassuolo",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 34,
+      "date": "2026-04-26",
+      "homeId": "genoa",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 34,
+      "date": "2026-04-26",
+      "homeId": "milan",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 34,
+      "date": "2026-04-26",
+      "homeId": "torino",
+      "awayId": "inter",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 34,
+      "date": "2026-04-27",
+      "homeId": "cagliari",
+      "awayId": "atalanta",
+      "homeGoals": 3,
+      "awayGoals": 2
+    },
+    {
+      "round": 34,
+      "date": "2026-04-27",
+      "homeId": "lazio",
+      "awayId": "udinese",
+      "homeGoals": 3,
+      "awayGoals": 3
+    },
+    {
+      "round": 35,
+      "date": "2026-05-01",
+      "homeId": "pisa",
+      "awayId": "lecce",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 35,
+      "date": "2026-05-02",
+      "homeId": "atalanta",
+      "awayId": "genoa",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-02",
+      "homeId": "como",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-02",
+      "homeId": "udinese",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-03",
+      "homeId": "bologna",
+      "awayId": "cagliari",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-03",
+      "homeId": "inter",
+      "awayId": "parma",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-03",
+      "homeId": "juventus",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 35,
+      "date": "2026-05-03",
+      "homeId": "sassuolo",
+      "awayId": "milan",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 35,
+      "date": "2026-05-04",
+      "homeId": "cremonese",
+      "awayId": "lazio",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 35,
+      "date": "2026-05-04",
+      "homeId": "roma",
+      "awayId": "fiorentina",
+      "homeGoals": 4,
+      "awayGoals": 0
+    },
+    {
+      "round": 36,
+      "date": "2026-05-08",
+      "homeId": "torino",
+      "awayId": "sassuolo",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 36,
+      "date": "2026-05-09",
+      "homeId": "cagliari",
+      "awayId": "udinese",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 36,
+      "date": "2026-05-09",
+      "homeId": "lazio",
+      "awayId": "inter",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 36,
+      "date": "2026-05-09",
+      "homeId": "lecce",
+      "awayId": "juventus",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 36,
+      "date": "2026-05-10",
+      "homeId": "cremonese",
+      "awayId": "pisa",
+      "homeGoals": 3,
+      "awayGoals": 0
+    },
+    {
+      "round": 36,
+      "date": "2026-05-10",
+      "homeId": "fiorentina",
+      "awayId": "genoa",
+      "homeGoals": 0,
+      "awayGoals": 0
+    },
+    {
+      "round": 36,
+      "date": "2026-05-10",
+      "homeId": "milan",
+      "awayId": "atalanta",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 36,
+      "date": "2026-05-10",
+      "homeId": "parma",
+      "awayId": "roma",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 36,
+      "date": "2026-05-10",
+      "homeId": "verona",
+      "awayId": "como",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 36,
+      "date": "2026-05-11",
+      "homeId": "napoli",
+      "awayId": "bologna",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "atalanta",
+      "awayId": "bologna",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "cagliari",
+      "awayId": "torino",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "como",
+      "awayId": "parma",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "genoa",
+      "awayId": "milan",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "inter",
+      "awayId": "verona",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "juventus",
+      "awayId": "fiorentina",
+      "homeGoals": 0,
+      "awayGoals": 2
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "pisa",
+      "awayId": "napoli",
+      "homeGoals": 0,
+      "awayGoals": 3
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "roma",
+      "awayId": "lazio",
+      "homeGoals": 2,
+      "awayGoals": 0
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "sassuolo",
+      "awayId": "lecce",
+      "homeGoals": 2,
+      "awayGoals": 3
+    },
+    {
+      "round": 37,
+      "date": "2026-05-17",
+      "homeId": "udinese",
+      "awayId": "cremonese",
+      "homeGoals": 0,
+      "awayGoals": 1
+    },
+    {
+      "round": 38,
+      "date": "2026-05-22",
+      "homeId": "fiorentina",
+      "awayId": "atalanta",
+      "homeGoals": 1,
+      "awayGoals": 1
+    },
+    {
+      "round": 38,
+      "date": "2026-05-23",
+      "homeId": "bologna",
+      "awayId": "inter",
+      "homeGoals": 3,
+      "awayGoals": 3
+    },
+    {
+      "round": 38,
+      "date": "2026-05-23",
+      "homeId": "lazio",
+      "awayId": "pisa",
+      "homeGoals": 2,
+      "awayGoals": 1
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "cremonese",
+      "awayId": "como",
+      "homeGoals": 1,
+      "awayGoals": 4
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "lecce",
+      "awayId": "genoa",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "milan",
+      "awayId": "cagliari",
+      "homeGoals": 1,
+      "awayGoals": 2
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "napoli",
+      "awayId": "udinese",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "parma",
+      "awayId": "sassuolo",
+      "homeGoals": 1,
+      "awayGoals": 0
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "torino",
+      "awayId": "juventus",
+      "homeGoals": 2,
+      "awayGoals": 2
+    },
+    {
+      "round": 38,
+      "date": "2026-05-24",
+      "homeId": "verona",
+      "awayId": "roma",
+      "homeGoals": 0,
+      "awayGoals": 2
+    }
+  ],
+  "players": []
+}
