@@ -1,0 +1,30 @@
+name: Verifica copertura Yuvron Serie A
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yuvron-coverage-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Scarica i sorgenti
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepara Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verifica la copertura di entrambe le stagioni
+        env:
+          YUVRON_RAPIDAPI_KEY: ${{ secrets.YUVRON_RAPIDAPI_KEY }}
+        run: python tools/yuvron_probe.py
