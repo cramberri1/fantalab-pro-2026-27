@@ -29,8 +29,9 @@ def stage_site(destination, snapshot):
         for source in (ROOT / folder).rglob('*'):
             if source.is_file() and not source.is_symlink() and source.suffix.lower() in extensions:
                 copy_file(source, destination / source.relative_to(ROOT))
-    if (ROOT / 'docs' / 'FONTI.md').is_file():
-        copy_file(ROOT / 'docs' / 'FONTI.md', destination / 'docs' / 'FONTI.md')
+    for name in ('docs/FONTI.md', 'docs/ANALISI.md', 'data/serie-a-2025-26.json'):
+        if (ROOT / name).is_file():
+            copy_file(ROOT / name, destination / name)
     copy_file(snapshot, destination / 'data' / SNAPSHOT.name)
     (destination / '.nojekyll').touch()
 
