@@ -207,9 +207,36 @@ tr:last-child td { border-bottom: 0; }
 .button-file input { position: absolute; inset: 0; width: 100%; opacity: 0; }
 .lineup-controls, .form-fields { display: flex; flex-wrap: wrap; gap: 9px; align-items: end; margin: 0 0 12px; }
 .lineup-controls select { min-width: 95px; }
-.bench { padding-left: 22px; font-size: .82rem; color: var(--soft); }
-.bench li { margin: 6px 0; }
-.bench button { padding: 1px 5px; min-height: 28px; margin-left: 3px; }
+.lineup-help { padding-top: 0; }
+.lineup-selection { margin-bottom: 10px; color: var(--lime); font-size: .84rem; }
+.lineup-selection:empty { margin: 0; }
+.lineup-roster .roster-list { max-height: min(56vh, 565px); overflow-y: auto; padding: 2px 7px 2px 3px; scrollbar-width: thin; }
+.lineup-roster .roster-list li { gap: 7px; }
+.lineup-roster .roster-list .lineup-handle { display: inline-flex; gap: 5px; align-items: center; justify-content: center; min-width: 43px; min-height: 38px; background: #1b2c23; color: var(--lime); }
+[data-lineup-drag] { touch-action: none; cursor: grab; user-select: none; }
+[data-lineup-drag][aria-pressed=true] { border-color: var(--lime); box-shadow: 0 0 0 2px #b9fa6840; }
+.pitch button.pitch-player { background: #10241b88; border-color: transparent; padding: 4px 5px; min-height: 54px; min-width: 39px; max-width: 95px; }
+.pitch button.pitch-player.vacant { background: #183328a8; border-color: #456b54; color: #d7e6db; }
+.bench { padding: 0; margin: 6px 0 9px; list-style: none; font-size: .82rem; color: var(--soft); }
+.bench li { display: flex; align-items: center; gap: 4px; margin: 4px 0; border: 1px solid transparent; border-radius: 8px; }
+.bench li button { min-height: 36px; min-width: 34px; padding: 3px 6px; }
+.bench .bench-player { flex: 1; text-align: left; min-width: 0; overflow-wrap: anywhere; }
+.bench-player span, .bench-player small { color: var(--green); }
+.lineup-drop-button { background: #17251d; border: 1px dashed #51705b; color: var(--soft); font-size: .82rem; }
+.lineup-bench .lineup-drop-button { width: 100%; }
+.lineup-drop-out { margin: 0 5px 6px 0; }
+.is-lineup-dragging, .is-lineup-dragging [data-lineup-drag] { cursor: grabbing; }
+.is-lineup-drag-source { opacity: .55; }
+.lineup-board .is-lineup-drop-valid, .lineup-board .is-lineup-tap-target { outline: 2px solid var(--lime); outline-offset: 1px; }
+.lineup-board .is-lineup-tap-target:focus-visible { outline: 3px double var(--lime); outline-offset: 3px; }
+.lineup-board .is-lineup-drop-invalid { outline: 2px solid var(--red); outline-offset: 1px; }
+.bench li.is-lineup-drop-valid { outline: 0; border-top-color: var(--lime); }
+.bench li.is-lineup-drop-valid.is-lineup-drop-after { border-top-color: transparent; border-bottom-color: var(--lime); }
+.lineup-drag-ghost { z-index: 12; transform: translate(-50%, calc(-100% - 18px)); padding: 5px 10px; border-radius: 8px; border: 1px solid var(--lime); background: #1b3020; color: var(--text); font-size: .8rem; font-weight: 700; white-space: nowrap; box-shadow: 0 5px 13px #0007; }
+@media (min-width: 591px) {
+  .lineup-board { grid-template-columns: minmax(0, 1fr) minmax(240px, 1.12fr); }
+  .lineup-formation { position: sticky; top: 12px; }
+}
 .histogram { display: grid; gap: 6px; margin-top: 10px; }
 .hist-row { display: grid; grid-template-columns: 70px minmax(0,1fr) 42px; align-items: center; gap: 7px; font-size: .76rem; color: var(--soft); }
 .hist-row .meter { height: 12px; margin: 0; border-radius: 3px; }
@@ -269,6 +296,10 @@ dialog::backdrop { background: #050a07cf; }
   .metric small { font-size: .67rem; line-height: 1.2; display: block; }
   .split { grid-template-columns: minmax(0, 1fr); }
   .panel { padding: 12px; }
+  .lineup-roster .roster-list { max-height: min(31dvh, 255px); }
+  .lineup-roster .roster-list .lineup-handle { min-height: 44px; }
+  .lineup-roster .file-actions { margin-top: 8px; }
+  .pitch button.pitch-player { max-width: 76px; padding-inline: 3px; }
   .fixture-main { gap: 4px; font-size: .82rem; }
   .fixture-row { min-height: 44px; }
   .team-code { min-width: 25px; height: 25px; }

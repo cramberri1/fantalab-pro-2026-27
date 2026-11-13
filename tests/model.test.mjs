@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzePlayer, getPlayerFixture, simulateLineup, validateLineup } from '../js/model.js';
+import { analyzePlayer, getPlayerFixture, placeLineupPlayer, simulateLineup, validateLineup } from '../js/model.js';
 
 const now = { id: 'week5', round: 5, homeId: 'a', awayId: 'b', kickoff: '2026-09-30T18:45:00Z', status: 'scheduled' };
 const fixtures = Array.from({ length: 4 }, (_, index) => ({
@@ -78,6 +78,33 @@ test('formation validation counts unique players by role', () => {
   const invalid = validateLineup([...players.slice(0, -1), players[0]], '3-4-3');
   assert.equal(invalid.valid, false);
   assert.equal(invalid.missing.FWD, 1);
+});
+
+test('lineup placement fills vacancies and swaps only players of the same role', () => {
+  const goalkeeper = { id: 'g', position: 'GK' };
+  const reserveKeeper = { id: 's', position: 'GK' };
+  const defender = { id: 'd', position: 'DEF' };
+  const roster = new Map([goalkeeper, reserveKeeper, defender].map(player => [player.id, player]));
+  const record = { formation: '3-4-3', starters: ['g'], reserves: ['s'] };
+  assert.deepEqual(placeLineupPlayer(record, roster, 's', { role: 'starter', position: 'GK', playerId: 'g' }),
+    { starters: ['s'], reserves: ['g'], replaced: goalkeeper });
+  assert.ok(placeLineupPlayer(record, roster, 'd', { role: 'starter', position: 'GK', playerId: 'g' }).error);
+  assert.ok(placeLineupPlayer(record, roster, 's', { role: 'starter' }).error);
+  assert.deepEqual(placeLineupPlayer(record, roster, 'd', { role: 'starter', position: 'DEF' }),
+    { starters: ['g', 'd'], reserves: ['s'] });
+  assert.deepEqual(record, { formation: '3-4-3', starters: ['g'], reserves: ['s'] });
+});
+
+test('lineup placement reorders the bench and removes a player from formation', () => {
+  const roster = new Map(['g', 'd', 's'].map(id => [id, { id, position: 'DEF' }]));
+  const record = { formation: '3-4-3', starters: ['g'], reserves: ['d', 's'] };
+  assert.deepEqual(placeLineupPlayer(record, roster, 's', { role: 'reserve', playerId: 'd' }),
+    { starters: ['g'], reserves: ['s', 'd'] });
+  assert.deepEqual(placeLineupPlayer(record, roster, 'g', { role: 'reserve', playerId: 'd', after: true }),
+    { starters: [], reserves: ['d', 'g', 's'] });
+  assert.deepEqual(placeLineupPlayer(record, roster, 'g', { role: 'none' }),
+    { starters: [], reserves: ['d', 's'] });
+  assert.deepEqual(placeLineupPlayer(record, roster, 's', { role: 'reserve', playerId: 'd', after: true }), {});
 });
 
 const predictionTime = '2026-09-29T18:45:00Z';

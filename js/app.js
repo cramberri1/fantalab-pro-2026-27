@@ -1,9 +1,10 @@
-import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture } from './model.js';
+import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, placeLineupPlayer } from './model.js';
 import { decodeRosterCsv, makeRosterCsvId, readRosterCsv, readVotesCsv } from './roster-import.js';
 import { readMarketWorkbook } from './market-import.js';
 import { buildMarket, rankMarketReplacements, compareMarketTrade } from './market.js';
 import { fixtureCalendarDay, getRoundWindow, isPendingFixture } from './calendar.js';
 import { predictMatch, backtestMatches } from './match-model.js';
+import { wireLineupDrag } from './lineup-drag.js';
 
 const PAGES = {
   panoramica: 'Panoramica', match: 'Match Center', giocatori: 'Calciatori', analisi: 'Analisi',
@@ -69,6 +70,7 @@ let historicalArchive;
 let historicalError = false;
 let historicalRequest;
 let matchBacktest;
+let lineupSelection;
 let analysisTeamId;
 const marketReadVersion = { listone: 0, svincolati: 0 };
 
@@ -247,6 +249,7 @@ async function switchMode(nextMode) {
 }
 function render() {
   if (!dataset) return;
+  lineupSelection = undefined;
   $('#page-label').textContent = PAGES[page];
   const select = $('#round');
   select.innerHTML = (rounds().length ? rounds() : [round]).map(r => `<option value="${r}">Giornata ${r}</option>`).join('');
@@ -615,44 +618,79 @@ function removePlayer(id) {
   render();
   notify('Calciatore rimosso dalla rosa e dalle formazioni salvate.');
 }
-function setLineupRole(id, role) {
+function lineupRoster() {
+  return new Map(groupPlayers(modeState().roster).map(player => [player.id, player]));
+}
+function renderLineupChange(focus) {
+  const scrollTop = $('.roster-list')?.scrollTop ?? 0;
+  render();
+  const rosterList = $('.roster-list');
+  if (rosterList) rosterList.scrollTop = scrollTop;
+  if (focus) focus()?.focus({ preventScroll: true });
+}
+function applyLineupPlacement(id, target, focus) {
   const record = lineup();
-  const player = getPlayer(id);
-  if (!modeState().roster.includes(id) || !player) return;
-  if (role === 'starter') {
-    const count = groupPlayers(record.starters).filter(p => p.position === player.position && p.id !== id).length;
-    const need = validateLineup([], record.formation).required[player.position] ?? 0;
-    if (count >= need || record.starters.length >= 11) {
-      notify('Il reparto è pieno per il modulo selezionato.');
-      render();
-      return;
-    }
+  const roster = lineupRoster();
+  const result = placeLineupPlayer(record, roster, id, target);
+  if (result.error) {
+    notify(result.error);
+    if (focus) renderLineupChange(focus);
+    return;
   }
-  record.starters = record.starters.filter(value => value !== id);
-  record.reserves = record.reserves.filter(value => value !== id);
-  if (role === 'starter') record.starters.push(id);
-  if (role === 'reserve') record.reserves.push(id);
+  if (!result.starters) return;
+  record.starters = result.starters;
+  record.reserves = result.reserves;
   simulationResult = undefined;
   save();
-  render();
-  Array.from(document.querySelectorAll('[data-lineup-role]')).find(element => element.dataset.lineupRole === id)?.focus({ preventScroll: true });
+  renderLineupChange(focus);
+  const name = roster.get(id).name;
+  if (result.replaced) notify(`${name} e ${result.replaced.name} scambiati.`);
+  else if (target.role === 'starter') notify(`${name} in campo.`);
+  else if (target.role === 'reserve') notify(`${name} in panchina.`);
+  else notify(`${name} fuori formazione.`);
+}
+function setLineupRole(id, role) {
+  applyLineupPlacement(id, { role }, () =>
+    [...pageView.querySelectorAll('[data-lineup-role]')].find(element => element.dataset.lineupRole === id));
 }
 function moveReserve(id, direction) {
   const reserves = lineup().reserves;
   const index = reserves.indexOf(id);
   const next = index + direction;
   if (index < 0 || next < 0 || next >= reserves.length) return;
-  [reserves[index], reserves[next]] = [reserves[next], reserves[index]];
-  simulationResult = undefined;
-  save();
-  render();
+  applyLineupPlacement(id, { role: 'reserve', playerId: reserves[next], after: direction > 0 }, () => {
+    const buttons = [...pageView.querySelectorAll('[data-reserve]:not(:disabled)')];
+    return buttons.find(button => button.dataset.reserve === id && Number(button.dataset.move) === direction)
+      ?? buttons.find(button => button.dataset.reserve === id);
+  });
+}
+function lineupDropTarget(element) {
+  const { lineupDrop: role, dropPosition: position, dropPlayer: playerId } = element.dataset;
+  return { role, position, playerId };
+}
+function setLineupSelection(id) {
+  lineupSelection = id === lineupSelection ? undefined : id;
+  const picked = lineupSelection && getPlayer(lineupSelection);
+  const roster = lineupRoster();
+  const record = lineup();
+  for (const handle of pageView.querySelectorAll('[data-lineup-drag]')) {
+    handle.setAttribute('aria-pressed', String(handle.dataset.lineupDrag === lineupSelection));
+  }
+  for (const zone of pageView.querySelectorAll('[data-lineup-drop]')) {
+    const canPlace = picked && placeLineupPlayer(record, roster, picked.id, lineupDropTarget(zone)).starters;
+    zone.classList.toggle('is-lineup-tap-target', Boolean(canPlace));
+  }
+  $('#lineup-selection').textContent = picked ? `${picked.name} selezionato. Scegli una destinazione.` : '';
+}
+function dragAttributes(player) {
+  return `data-lineup-drag="${html(player.id)}" data-drag-label="${html(player.name)}" aria-pressed="false"`;
 }
 function pitch(record, validation) {
   return `<div class="pitch" role="group" aria-label="Formazione ${html(record.formation)} sul campo">${['FWD', 'MID', 'DEF', 'GK'].map(role => {
     const picked = groupPlayers(record.starters).filter(p => p.position === role);
     const missing = Math.max(0, (validation.required[role] ?? 0) - picked.length);
-    return `<div class="pitch-row" aria-label="${ROLES[role]}">${picked.map(p => `<div class="pitch-player"><span>${SHORT[role]}</span><span>${html(p.name)}</span></div>`).join('')}
-      ${Array.from({ length: missing }, () => `<div class="pitch-player vacant"><span>${SHORT[role]}</span><span>Libero</span></div>`).join('')}</div>`;
+    return `<div class="pitch-row" aria-label="${ROLES[role]}">${picked.map(p => `<button type="button" class="pitch-player" ${dragAttributes(p)} data-lineup-drop="starter" data-drop-position="${role}" data-drop-player="${html(p.id)}"><span aria-hidden="true">${SHORT[role]}</span><span>${html(p.name)}</span></button>`).join('')}
+      ${Array.from({ length: missing }, (_, index) => `<button type="button" class="pitch-player vacant" data-lineup-drop="starter" data-drop-position="${role}" aria-label="${ROLES[role]} · posto libero ${index + 1}"><span aria-hidden="true">${SHORT[role]}</span><span>Libero</span></button>`).join('')}</div>`;
   }).join('')}</div>`;
 }
 function rosa() {
@@ -667,12 +705,14 @@ function rosa() {
     ? '<button class="primary" data-load-preset>Carica rosa demo</button>'
     : '<a class="btn" href="#mercato">Apri il mercato</a>';
   return `${heading('La mia rosa', 'Organizza titolari e panchina per giornata. Le modifiche vengono salvate su questo browser.', presetButton)}
-  <div class="split">
-    <section class="panel"><div class="panel-head"><div><h2>Rosa</h2><p>${roster.length} calciatori selezionati</p></div><a class="text-link" href="#giocatori">Apri il listone →</a></div>
+  <p class="inline-status lineup-help">Trascina un calciatore oppure selezionalo e scegli dove metterlo. Per sostituire un titolare, scegli un calciatore dello stesso ruolo.</p>
+  <p class="lineup-selection" id="lineup-selection" role="status"></p>
+  <div class="split lineup-board">
+    <section class="panel lineup-roster"><div class="panel-head"><div><h2>Rosa</h2><p>${roster.length} calciatori</p></div><a class="text-link" href="#giocatori">Apri il listone →</a></div>
       ${choices.length ? `<form class="roster-add" id="roster-add"><label class="field-label">Aggiungi dal listone<select id="roster-choice" required><option value="">Seleziona calciatore</option>${choices.map(p => `<option value="${html(p.id)}">${html(p.name)} · ${html(getTeam(p.teamId)?.shortName)} · ${SHORT[p.position] ?? '—'}</option>`).join('')}</select></label><button type="submit">Aggiungi</button></form>` : ''}
-      ${roster.length ? `<ul class="roster-list">${roster.map(p => {
+      ${roster.length ? `<ul class="roster-list" data-lineup-scroll>${roster.map(p => {
         const active = record.starters.includes(p.id) ? 'starter' : record.reserves.includes(p.id) ? 'reserve' : 'none';
-        return `<li><span class="team-code">${SHORT[p.position] ?? '—'}</span><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>
+        return `<li><button type="button" class="lineup-handle" ${dragAttributes(p)} aria-label="Sposta ${html(p.name)}"><span aria-hidden="true">⠿</span><span aria-hidden="true">${SHORT[p.position] ?? '—'}</span></button><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>
           ${p.id.startsWith('csv:') ? status('Da CSV · senza statistiche', 'partial') : ''}
           <select data-lineup-role="${html(p.id)}" aria-label="Impiego di ${html(p.name)}">${[['none','Fuori'],['starter','Titolare'],['reserve','Panchina']].map(([key,label]) => `<option value="${key}" ${key === active ? 'selected' : ''}>${label}</option>`).join('')}</select>
           <button data-remove="${html(p.id)}" aria-label="Rimuovi ${html(p.name)}">✕</button></li>`;
@@ -688,14 +728,16 @@ function rosa() {
           ${importReport.unresolved.length > 50 ? '<li>Mostrate le prime 50 righe.</li>' : ''}
         </ul></details>` : ''}</div>` : ''}
     </section>
-    <section class="panel">
+    <section class="panel lineup-formation">
       <div class="panel-head"><div><h2>Formazione</h2><p>Giornata ${round}</p></div>${status(validation.valid ? '11 titolari validi' : `${starters.length} / 11 titolari`, validation.valid ? 'available' : 'partial')}</div>
       <div class="lineup-controls"><label class="field-label">Modulo<select id="formation">${FORMATION_OPTIONS.map(f => `<option value="${f}" ${f === record.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
         <label class="field-label">Max cambi<select id="substitutions">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${n === record.maxSubstitutions ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
       ${pitch(record, validation)}
       ${!validation.valid && starters.length ? `<p class="inline-status">${html(validation.errors.join(' '))}</p>` : ''}
-      <div class="duel"><h3>Panchina</h3><p>Priorità dall’alto verso il basso. Sostituzioni fra calciatori dello stesso ruolo.</p>
-      ${reserves.length ? `<ol class="bench">${reserves.map((p, i) => `<li>${html(p.name)} · ${SHORT[p.position] ?? '—'} <button data-reserve="${html(p.id)}" data-move="-1" aria-label="Sposta ${html(p.name)} in alto" ${i === 0 ? 'disabled' : ''}>↑</button><button data-reserve="${html(p.id)}" data-move="1" aria-label="Sposta ${html(p.name)} in basso" ${i === reserves.length - 1 ? 'disabled' : ''}>↓</button></li>`).join('')}</ol>` : empty('Nessuna riserva selezionata.')}</div>
+      <div class="duel lineup-bench"><h3>Panchina</h3><p>Priorità dall’alto verso il basso. Sostituzioni fra calciatori dello stesso ruolo.</p>
+      ${reserves.length ? `<ol class="bench">${reserves.map((p, i) => `<li data-lineup-drop="reserve" data-drop-player="${html(p.id)}"><button type="button" class="bench-player" ${dragAttributes(p)}><span aria-hidden="true">⠿</span> ${html(p.name)} <small>${SHORT[p.position] ?? '—'}</small></button><button data-reserve="${html(p.id)}" data-move="-1" aria-label="Sposta ${html(p.name)} in alto" ${i === 0 ? 'disabled' : ''}>↑</button><button data-reserve="${html(p.id)}" data-move="1" aria-label="Sposta ${html(p.name)} in basso" ${i === reserves.length - 1 ? 'disabled' : ''}>↓</button></li>`).join('')}</ol>` : ''}
+      <button class="lineup-drop-button" type="button" data-lineup-drop="reserve" data-drop-append>Aggiungi in coda</button></div>
+      <button class="lineup-drop-button lineup-drop-out" type="button" data-lineup-drop="none">Fuori formazione</button>
       <a class="btn primary" href="#simulazione">Vai alla simulazione ${iconSpan('arrow')}</a>
     </section>
   </div>`;
@@ -1301,6 +1343,17 @@ function setPage(next) {
   $('#workspace').focus({ preventScroll: true });
 }
 function wireEvents() {
+  wireLineupDrag(pageView, {
+    getFeedback(id, target) {
+      return page === 'rosa' && Boolean(placeLineupPlayer(lineup(), lineupRoster(), id, target).starters);
+    },
+    onDrop(id, target) {
+      if (page === 'rosa') applyLineupPlacement(id, target);
+    }
+  });
+  pageView.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && lineupSelection) setLineupSelection(lineupSelection);
+  });
   for (const element of document.querySelectorAll('[data-icon]')) element.innerHTML = icon(element.dataset.icon);
   window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
@@ -1323,6 +1376,28 @@ function wireEvents() {
   });
   dialog.addEventListener('close', () => lastFocus?.isConnected && lastFocus.focus());
   document.addEventListener('click', event => {
+    if (page === 'rosa' && dataset && pageView.contains(event.target)) {
+      const handle = event.target.closest('[data-lineup-drag]');
+      const zone = event.target.closest('[data-lineup-drop]');
+      if (zone && lineupSelection && !event.target.closest('[data-reserve]') &&
+          (zone.dataset.dropPlayer !== lineupSelection || !handle)) {
+        const id = lineupSelection;
+        applyLineupPlacement(id, lineupDropTarget(zone));
+        if (!lineupSelection && event.detail === 0) {
+          const handles = [...pageView.querySelectorAll('[data-lineup-drag]')].filter(button => button.dataset.lineupDrag === id);
+          (handles.find(button => !button.closest('.roster-list')) ?? handles[0])?.focus({ preventScroll: true });
+        }
+        return;
+      }
+      if (handle) {
+        setLineupSelection(handle.dataset.lineupDrag);
+        return;
+      }
+      if (zone && !event.target.closest('[data-reserve]')) {
+        notify('Seleziona prima un calciatore dalla rosa, dal campo o dalla panchina.');
+        return;
+      }
+    }
     const control = event.target.closest('button');
     if (!control) return;
     const data = control.dataset;

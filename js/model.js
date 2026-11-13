@@ -57,6 +57,49 @@ export function validateLineup(players, formation) {
   return { valid: errors.length === 0, counts, required, errors, missing };
 }
 
+export function placeLineupPlayer(record, roster, id, target) {
+  const player = roster.get(id);
+  const { role, position, playerId, after } = target;
+  if (!player || !['starter', 'reserve', 'none'].includes(role)) return {};
+  const starterIndex = record.starters.indexOf(id);
+  const reserveIndex = record.reserves.indexOf(id);
+  const { starters, reserves } = record;
+  if (playerId === id || (role === 'none' && starterIndex < 0 && reserveIndex < 0)) return {};
+  if (role === 'starter') {
+    if (position && player.position !== position) return { error: 'Scegli un posto dello stesso ruolo.' };
+    if (playerId) {
+      const replacedIndex = starters.indexOf(playerId);
+      const replaced = roster.get(playerId);
+      if (replacedIndex < 0 || replaced?.position !== player.position) return { error: 'Scegli un titolare dello stesso ruolo.' };
+      const nextStarters = [...starters];
+      nextStarters[replacedIndex] = id;
+      if (starterIndex >= 0) {
+        nextStarters[starterIndex] = playerId;
+        return { starters: nextStarters, reserves, replaced };
+      }
+      const nextReserves = [...reserves];
+      if (reserveIndex >= 0) nextReserves[reserveIndex] = playerId;
+      else nextReserves.push(playerId);
+      return { starters: nextStarters, reserves: nextReserves, replaced };
+    }
+    if (starterIndex >= 0) return {};
+    const required = validateLineup([], record.formation).required[player.position] ?? 0;
+    const count = starters.filter(starterId => roster.get(starterId)?.position === player.position).length;
+    if (count >= required || starters.length >= 11) return { error: 'Il reparto è pieno. Scegli un titolare da sostituire.' };
+    return { starters: [...starters, id], reserves: reserves.filter(reserveId => reserveId !== id) };
+  }
+  const nextStarters = starters.filter(starterId => starterId !== id);
+  const nextReserves = reserves.filter(reserveId => reserveId !== id);
+  if (role === 'reserve') {
+    const index = playerId ? nextReserves.indexOf(playerId) : nextReserves.length;
+    if (index < 0) return {};
+    nextReserves.splice(index + Number(Boolean(playerId && after)), 0, id);
+  }
+  if (starterIndex < 0 && nextReserves.length === reserves.length &&
+      nextReserves.every((reserveId, index) => reserveId === reserves[index])) return {};
+  return { starters: nextStarters, reserves: nextReserves };
+}
+
 function hasTeam(fixture, teamId) {
   return sameId(fixture.homeId, teamId) || sameId(fixture.awayId, teamId);
 }
