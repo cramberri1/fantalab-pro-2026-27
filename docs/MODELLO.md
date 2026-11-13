@@ -19,7 +19,14 @@ Se manca un componente, i pesi degli altri vengono riscalati. La copertura somma
 
 Le frequenze di gol e assist per 90 minuti combinano il 65% del valore atteso e il 35% degli eventi registrati quando entrambi sono disponibili. Se è disponibile uno solo dei due, si usa quello. Il valore del provider conserva la propria provenienza. Il fattore avversario per i gol e gli assist stimati va da 0,8 a 1,2. La stima per il portiere usa anche la media tra i gol subiti di recente dalla sua squadra e i gol segnati di recente dall’avversario, con almeno quattro partite utili per squadra.
 
-Il voto base è fisso a 6 in ogni presenza simulata. Ogni gol vale +3 e ogni assist +1. Dove lo storico è sufficiente, il modello sottrae 0,5 per una possibile ammonizione e 1 per ogni gol subito da un portiere. Se mancano sia il conteggio sia il valore atteso di gol o assist, la stima del fantapunteggio resta vuota.
+Nel modello per eventi, il voto base è fisso a 6 in ogni presenza simulata. Ogni gol vale +3 e ogni assist +1. Dove lo storico è sufficiente, il modello sottrae 0,5 per una possibile ammonizione e 1 per ogni gol subito da un portiere.
+
+Quando il modello per eventi non ha i dati necessari, la stima può usare uno dei due campioni di voti.
+
+- **FantaTB.** Campiona i fantavoti registrati prima della partita, con almeno tre osservazioni esplicite e almeno due voti. Una riga assente resta sconosciuta. I senza voto espliciti entrano nel campione solo se l’archivio è privo di voti ambigui.
+- **Excel di lega.** Dopo aver indicato la giornata inclusa nel file in **Mercato**, il modello può usare le partite a voto e la fantamedia della lega per la giornata immediatamente successiva. La probabilità di ricevere voto è il rapporto tra voti e gare concluse della squadra. Con almeno tre voti, ogni esito a voto usa la fantamedia del file. La variabilità del voto non si ricava da una sola media.
+
+Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. La tabella mostra il metodo impiegato e le eventuali esclusioni. Per le stime da voti l’indice basato su minuti ed eventi resta vuoto.
 
 ## Simulazione Monte Carlo
 

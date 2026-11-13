@@ -27,7 +27,8 @@ L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, cal
 - Calendario di 380 partite. OpenFootball, Football Analytics e i referti dei club coprono tutti i 110 risultati finali fino alla 11ª giornata.
 - 652 voci del listone TransferBeat del 1° ottobre e 1.416 voti FantaTB delle prime cinque giornate.
 - xG di squadra di calcio.it su 110 partite misurate, esposti con il loro campione.
-- xG e xA individuali, minuti e altre statistiche necessarie alle previsioni, nonché le indisponibilità attuali, richiedono un feed aggiuntivo. La modalità reale segnala le lacune. Gli indici e le simulazioni reali si attivano per i giocatori con dati sufficienti.
+- Archivio Serie A 2025/26 con 380 risultati OpenFootball. La sezione **Analisi** confronta gol, punti e porte inviolate per partita, in casa e in trasferta. [Fonti per le due stagioni](docs/ANALISI.md).
+- La simulazione può usare i fantavoti FantaTB o la fantamedia dell’Excel di lega con giornata confermata. Il modello dettagliato, lo storico individuale 2025/26 e le indisponibilità aggiornate richiedono un feed con copertura e diritti verificati.
 
 [Fonti, licenze e copertura](docs/FONTI.md) · [Metodo e limiti del modello](docs/MODELLO.md)
 

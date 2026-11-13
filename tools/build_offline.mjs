@@ -61,13 +61,13 @@ function inlineModules(app, modules) {
   return code.replace(/<\/script/gi, match => match.replace('/', '\\/'));
 }
 
-function inlineData(source, mode) {
+function inlineData(source, mode, season = '2026/27', id = mode) {
   const data = JSON.parse(source);
-  if (data.mode !== mode || data.season !== '2026/27' || data.schemaVersion !== 1) {
+  if (data.mode !== mode || data.season !== season || data.schemaVersion !== 1) {
     throw new Error(`Snapshot ${mode} incompatibile.`);
   }
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  return `<script type="application/json" id="data-${mode}">${json}</script>`;
+  return `<script type="application/json" id="data-${id}">${json}</script>`;
 }
 
 function replaceRequired(value, pattern, replacement) {
@@ -75,19 +75,23 @@ function replaceRequired(value, pattern, replacement) {
   return value.replace(pattern, replacement);
 }
 
-const [html, css, icon, model, rosterImport, marketImport, market, app, real, demo] = await Promise.all([
+const [html, css, icon, model, rosterImport, marketImport, market, calendar, app, real, demo, history] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
-  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/app.js'),
-  read('data/serie-a-2026-27.json'), read('data/demo.json')
+  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/app.js'),
+  read('data/serie-a-2026-27.json'), read('data/demo.json'),
+  read('data/serie-a-2025-26.json').catch(error => { if (error.code === 'ENOENT') return null; throw error; })
 ]);
 const styles = await inlineStyles(css);
 const modules = [
   { path: 'model.js', namespace: 'FantaLabModel', source: model },
   { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport },
   { path: 'market-import.js', namespace: 'FantaLabMarketImport', source: marketImport },
-  { path: 'market.js', namespace: 'FantaLabMarket', source: market }
+  { path: 'market.js', namespace: 'FantaLabMarket', source: market },
+  { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar }
 ];
-const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'), `<script type="module">\n${inlineModules(app, modules)}\n</script>`];
+const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'),
+  ...(history ? [inlineData(history, 'real', '2025/26', 'history')] : []),
+  `<script type="module">\n${inlineModules(app, modules)}\n</script>`];
 const withIcon = replaceRequired(html, /(<link rel="icon" href=")assets\/mark\.svg(")/, (_, start, end) => start + icon + end);
 const withStyles = replaceRequired(withIcon, /<link rel="stylesheet" href="styles\.css">/, () => `<style>\n${styles}\n</style>`);
 const output = replaceRequired(withStyles, /<script type="module" src="js\/app\.js"><\/script>/, () => scripts.join('\n  '));
