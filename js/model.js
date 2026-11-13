@@ -8,7 +8,7 @@ const PENDING = new Set(['scheduled', 'timed', 'upcoming', 'tbd', 'ns', 'not sta
 const RULED_OUT = new Set(['out', 'injured', 'suspended', 'unavailable', 'ruled_out', 'ruled out']);
 const QUESTIONABLE = new Set(['doubtful', 'questionable', 'doubt', 'probable', 'uncertain']);
 const CONFIRMED = new Set(['available', 'fit', 'cleared']);
-const METHODS = ['events', 'league-average', 'fantatb-history'];
+const METHODS = ['league-history', 'league-average', 'fantatb-history', 'events'];
 const FANTASY_SOURCE = 'transferbeat-ratings';
 const MIN_HISTORICAL_OBSERVATIONS = 3;
 const MIN_HISTORICAL_VOTES = 2;
@@ -285,17 +285,43 @@ function leagueFantasy(record, dataset, fixture, sample, asOf) {
   };
 }
 
+function localFantasy(record, dataset, fixture, sample, asOf) {
+  if (!Array.isArray(sample?.rows) || typeof sample.source !== 'string') return null;
+  const cutoff = fixtureTime(fixture);
+  const completedRounds = new Map(dataset.fixtures.filter(match => hasTeam(match, record.teamId)
+    && COMPLETED.has(statusKey(match.status)) && fixtureTime(match) < cutoff
+    && fixtureTime(match) <= asOf).map(match => [match.round, match]));
+  const observations = new Map();
+  for (const row of sample.rows) {
+    if (row.season !== dataset.season || row.id !== record.id || row.teamId !== record.teamId
+      || row.round >= fixture.round || !completedRounds.has(row.round)) continue;
+    if (row.fantasyRating === null || finite(row.fantasyRating)) observations.set(row.round, row.fantasyRating);
+  }
+  const rounds = [...observations.keys()].sort((a, b) => a - b);
+  const scores = rounds.map(day => observations.get(day)).filter(finite);
+  if (rounds.length < MIN_HISTORICAL_OBSERVATIONS || scores.length < MIN_HISTORICAL_VOTES) return null;
+  return {
+    method: 'league-history', voteProbability: scores.length / rounds.length, scores,
+    sample: { source: sample.source, observations: rounds.length, votes: scores.length, rounds },
+  };
+}
+
 function empiricalAnalysis(record, result, dataset, options) {
   if (result.mode !== 'real' || !result.fixture || !Number.isFinite(fixtureTime(result.fixture))) return null;
-  const fromHistory = options.method === 'league-average' ? null : historicalFantasy(record, dataset, result.fixture, options.asOfTime);
-  const fromLeague = options.method === 'fantatb-history' ? null
-    : leagueFantasy(record, dataset, result.fixture, options.fantasySample, options.asOfTime);
-  const empirical = fromLeague && (!fromHistory || fromLeague.sample.asOfRound > fromHistory.sample.asOfRound) ? fromLeague : fromHistory;
+  const local = !options.method || options.method === 'league-history'
+    ? localFantasy(record, dataset, result.fixture, options.leagueVotes, options.asOfTime) : null;
+  const fromHistory = !local && (!options.method || options.method === 'fantatb-history')
+    ? historicalFantasy(record, dataset, result.fixture, options.asOfTime) : null;
+  const fromLeague = !local && (!options.method || options.method === 'league-average')
+    ? leagueFantasy(record, dataset, result.fixture, options.fantasySample, options.asOfTime) : null;
+  const empirical = local ?? (fromLeague && (!fromHistory || fromLeague.sample.asOfRound > fromHistory.sample.asOfRound) ? fromLeague : fromHistory);
   if (!empirical) return null;
   const { sample, method } = empirical;
   const voteProbability = empirical.voteProbability * result.availability.multiplier;
   const projection = { ...empirical, voteProbability, appearanceProbability: null, startProbability: null, expectedMinutes: null };
-  const notes = method === 'league-average'
+  const notes = method === 'league-history'
+    ? [`Fantavoti CSV · ${sample.source} · giornate ${sample.rounds.join(', ')}. ${sample.votes} voti su ${sample.observations} righe esplicite. Le righe mancanti sono escluse.`]
+    : method === 'league-average'
     ? [`Dati dell’Excel di lega fino alla giornata ${sample.asOfRound}. ${sample.votes} voti su ${sample.observations} partite della squadra. Ogni voto simulato usa la fantamedia del file. La variabilità del singolo voto non è disponibile.`]
     : [`Fantavoti FantaTB dalle giornate ${sample.rounds.join(', ')}. ${sample.votes} voti su ${sample.observations} registrazioni esplicite. Le righe mancanti sono escluse.`];
   if (result.availability.status === 'unknown') notes.push('Disponibilità per la giornata non verificata.');
@@ -306,7 +332,7 @@ function empiricalAnalysis(record, result, dataset, options) {
 
 export function analyzePlayer(player, options = {}) {
   const { dataset, round, mode = dataset?.mode } = options;
-  const localPlayer = mode === 'real' && options.fantasySample && typeof player?.id === 'string'
+  const localPlayer = mode === 'real' && (options.fantasySample || options.leagueVotes) && typeof player?.id === 'string'
     && player.id.startsWith('csv:') && POSITIONS.includes(player.position)
     && (dataset?.teams ?? []).some((team) => sameId(team.id, player.teamId));
   const record = dataset?.players?.find((item) => sameId(item.id, player?.id)) ?? (localPlayer ? player : null);
@@ -357,18 +383,19 @@ export function analyzePlayer(player, options = {}) {
     return empiricalAnalysis(record, result, dataset, empiricalOptions)
       ?? { ...result, notes: ['Campione di voti verificati insufficiente per questo metodo.'] };
   }
+  const empirical = options.method ? null : empiricalAnalysis(record, result, dataset, empiricalOptions);
 
   const completed = fixtures.filter((match) => finishedBefore(match, fixture));
   const teamGames = completed.filter((match) => hasTeam(match, record.teamId)).length;
   const teamGamesAll = fixtures.filter((match) => COMPLETED.has(statusKey(match.status)) && hasTeam(match, record.teamId)).length;
   if (teamGames < teamGamesAll) {
-    return (options.method ? null : empiricalAnalysis(record, result, dataset, empiricalOptions))
+    return empirical
       ?? { ...result, teamGames, notes: ['Le statistiche di stagione includono gare della squadra successive alla partita selezionata.'] };
   }
   const playing = playingTime(record, teamGames, availability);
   if (!playing) {
-    return (options.method ? null : empiricalAnalysis(record, result, dataset, empiricalOptions))
-      ?? { ...result, teamGames, notes: ['Minuti e presenze insufficienti. Servono almeno tre registrazioni FantaTB, di cui due con voto, oppure un Excel di lega verificato per la prossima giornata.'] };
+    return empirical
+      ?? { ...result, teamGames, notes: ['Minuti e presenze insufficienti. Servono almeno tre registrazioni storiche, di cui due con voto, oppure un Excel di lega verificato per la prossima giornata.'] };
   }
 
   const goalRate = per90(record.goals, record.xg, record.minutes);
@@ -386,10 +413,7 @@ export function analyzePlayer(player, options = {}) {
   };
   const ratings = indexComponents({ ...projection, goalRate: goalRate.value, assistRate: assistRate.value }, teamGames, record.position);
   const expectedPoints = expectedScore(projection);
-  if (expectedPoints == null && !options.method) {
-    const empirical = empiricalAnalysis(record, result, dataset, empiricalOptions);
-    if (empirical) return empirical;
-  }
+  if (empirical && (expectedPoints == null || result.mode === 'real')) return { ...empirical, ...ratings, teamGames };
   const notes = [];
   if (!fixture) notes.push('Stima media di stagione senza una partita associata.');
   if (dataset.coverage?.fixtures === 'partial' || dataset.coverage?.results === 'partial') {
@@ -445,7 +469,7 @@ function poisson(lambda, rng) {
 
 function drawScore(projection, rng) {
   const draw = rng();
-  if (projection.method === 'fantatb-history' || projection.method === 'league-average') {
+  if (projection.voteProbability != null) {
     if (draw >= projection.voteProbability) return null;
     return projection.scores[Math.floor(rng() * projection.scores.length)];
   }
@@ -481,7 +505,7 @@ function makeHistogram(values) {
 }
 
 export function simulateLineup(starters, options = {}) {
-  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples, asOf = Date.now() } = options;
+  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples, leagueVotesByPlayer, asOf = Date.now() } = options;
   const iterations = clamp(Math.trunc(Number(options.iterations) || 5000), 1, 30000);
   const maxSubstitutions = clamp(Math.trunc(Number(options.maxSubstitutions ?? 3) || 0), 0, 11);
   const empty = { status: 'insufficient', mode, method: null, methods: {}, mean: null, p10: null, p50: null, p90: null, min: null, max: null, histogram: [], individual: [], excluded: [], coverage: 0, iterations: 0, seed, notes: [] };
@@ -503,7 +527,7 @@ export function simulateLineup(starters, options = {}) {
     const fantasySample = fantasySamples instanceof Map ? fantasySamples.get(record.id)
       : fantasySamples && Object.hasOwn(fantasySamples, record.id) ? fantasySamples[record.id] : null;
     const analyze = (method) => {
-      const result = analyzePlayer(record, { dataset, round, mode, fantasySample, asOf, method });
+      const result = analyzePlayer(record, { dataset, round, mode, fantasySample, leagueVotes: leagueVotesByPlayer?.get(record.id), asOf, method });
       if (round != null && round !== '' && !result.fixture && result.notes[0] !== 'Giocatore assente dall’archivio selezionato.') {
         return { ...result, expectedPoints: null, notes: ['La squadra non ha una partita verificata per la giornata selezionata.'] };
       }
@@ -597,9 +621,12 @@ export function simulateLineup(starters, options = {}) {
   }));
   const methods = Object.create(null);
   for (const row of individual) methods[row.method] = (methods[row.method] ?? 0) + 1;
+  const localSource = eligibleStarters.find(entry => entry.analysis.projection.sample?.source)?.analysis.projection.sample.source;
   const notes = method === 'events' ? [
     'Simulazione con eventi indipendenti tra giocatori. Gol, assist e gol subiti seguono distribuzioni di Poisson.',
     'Il modello assegna un voto base di 6 per ogni presenza simulata.',
+  ] : method === 'league-history' ? [
+    `La simulazione estrae un fantavoto dal CSV della lega${localSource ? ` (${localSource})` : ''}. Le righe esplicite senza voto contribuiscono alla probabilità di sostituzione.`,
   ] : method === 'league-average' ? [
     'Stima basata sull’Excel di lega. Ogni giocatore ha una probabilità di ricevere voto e ottiene la propria fantamedia quando riceve voto. Il file non misura la variabilità del singolo fantavoto.',
   ] : [

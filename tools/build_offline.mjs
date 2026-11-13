@@ -75,9 +75,9 @@ function replaceRequired(value, pattern, replacement) {
   return value.replace(pattern, replacement);
 }
 
-const [html, css, icon, model, rosterImport, marketImport, market, calendar, app, real, demo, history] = await Promise.all([
+const [html, css, icon, model, rosterImport, marketImport, market, calendar, matchModel, app, real, demo, history] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
-  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/app.js'),
+  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/match-model.js'), read('js/app.js'),
   read('data/serie-a-2026-27.json'), read('data/demo.json'),
   read('data/serie-a-2025-26.json').catch(error => { if (error.code === 'ENOENT') return null; throw error; })
 ]);
@@ -87,7 +87,10 @@ const modules = [
   { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport },
   { path: 'market-import.js', namespace: 'FantaLabMarketImport', source: marketImport },
   { path: 'market.js', namespace: 'FantaLabMarket', source: market },
-  { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar }
+  { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar },
+  { path: 'match-model.js', namespace: 'FantaLabMatchModel',
+    source: replaceRequired(matchModel, /^import \{ fixtureCalendarDay \} from '\.\/calendar\.js';/m,
+      'const { fixtureCalendarDay } = FantaLabCalendar;') }
 ];
 const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'),
   ...(history ? [inlineData(history, 'real', '2025/26', 'history')] : []),

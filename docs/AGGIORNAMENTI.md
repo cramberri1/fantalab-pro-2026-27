@@ -26,6 +26,8 @@ In **Settings → Secrets and variables → Actions**, aggiungi il segreto `API_
 
 L’adattatore verifica l’accesso alla lega `135` e alla stagione `2026`. Importa risultati finali mancanti, statistiche stagionali su identità compatibili con il listone e indisponibilità legate a una partita quando la copertura e l’abbinamento lo permettono. Un’assenza di segnalazioni lascia la disponibilità sconosciuta. Un abbinamento ambiguo lascia vuoti i campi del giocatore. In locale, passa `--with-api-football` con chiave e variabile d’ambiente configurate.
 
+Nel 2026 il piano Free dà accesso alle stagioni 2022/23–2024/25. Per valutare fornitori con accesso gratuito alla stagione corrente, consulta [le API esaminate](ANALISI.md#api-con-piano-gratuito). [Guida ufficiale API-Football](https://www.api-football.com/news/post/how-to-get-all-data-from-a-league-with-api-football)
+
 ## Statistiche da un feed autorizzato
 
 Pubblica l’export normalizzato presso un endpoint HTTPS accessibile al runner. Configura i segreti `FANTALAB_METRICS_URL` e, se l’endpoint lo richiede, `FANTALAB_METRICS_BEARER`. Attiva `METRICS_PUBLISH_ALLOWED=true` quando i diritti coprono i campi che saranno esposti sul sito. In locale usa `FANTALAB_METRICS_FILE` per il percorso del JSON e aggiungi `--with-metrics` al comando.

@@ -134,6 +134,27 @@ test('empirical simulation samples votes and historical scores reproducibly', ()
   assert.deepEqual(run, simulateLineup([fantasyOnly], options));
 });
 
+test('local league CSV takes precedence and uses only explicit current-season observations before the fixture', () => {
+  const player = { ...forward, ratings: fantasyOnly.ratings };
+  const sourceDataset = { ...realDataset, season: '2026/27', players: [player] };
+  const row = (round, fantasyRating, season = '2026/27', teamId = 'a') => ({
+    id: player.id, season, round, teamId, fantasyRating
+  });
+  const leagueVotes = { source: 'Regolamento della lega', rows: [
+    row(1, 7), row(2, null), row(3, 0), row(4, 10, '2025/26'), row(4, 10, '2026/27', 'b'), row(5, 25)
+  ] };
+  const options = { dataset: sourceDataset, round: 5, asOf: predictionTime, leagueVotes };
+  const result = analyzePlayer(player, options);
+  assert.equal(result.projection.method, 'league-history');
+  assert.deepEqual(result.projection.sample.rounds, [1, 2, 3]);
+  assert.equal(result.projection.voteProbability, 2 / 3);
+  assert.ok(result.index > 0);
+  const simulation = simulateLineup([player], { ...options, iterations: 10000,
+    leagueVotesByPlayer: new Map([[player.id,leagueVotes]]) });
+  assert.equal(simulation.method, 'league-history');
+  assert.ok(Math.abs(simulation.mean - 7 / 3) < 0.1);
+});
+
 test('private league samples cover local roster IDs and preserve one scoring basis per simulation', () => {
   const local = { id: 'csv:a:FWD:locale', name: 'Giocatore locale', position: 'FWD', teamId: 'a' };
   const league = { gamesWithVote: 3, fantasyAverage: 8, teamGames: 4, asOfRound: 4 };

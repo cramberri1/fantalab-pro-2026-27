@@ -21,12 +21,17 @@ Le frequenze di gol e assist per 90 minuti combinano il 65% del valore atteso e 
 
 Nel modello per eventi, il voto base è fisso a 6 in ogni presenza simulata. Ogni gol vale +3 e ogni assist +1. Dove lo storico è sufficiente, il modello sottrae 0,5 per una possibile ammonizione e 1 per ogni gol subito da un portiere.
 
-Quando il modello per eventi non ha i dati necessari, la stima può usare uno dei due campioni di voti.
+In modalità reale, la stima del fantapunteggio privilegia le basi di voto disponibili. Quando sono disponibili minuti e statistiche di gioco, l’indice di schierabilità continua a usarli.
 
+- **CSV di lega.** Campiona almeno due fantavoti su almeno tre registrazioni esplicite del 2026/27. Ogni riga usata deve riferirsi a una partita già conclusa prima della previsione e a un giocatore abbinato alla squadra. Le righe esplicite senza voto influiscono sulla probabilità di ricevere voto. I fantavoti 2025/26 restano consultabili in scheda.
 - **FantaTB.** Campiona i fantavoti registrati prima della partita, con almeno tre osservazioni esplicite e almeno due voti. Una riga assente resta sconosciuta. I senza voto espliciti entrano nel campione solo se l’archivio è privo di voti ambigui.
 - **Excel di lega.** Dopo aver indicato la giornata inclusa nel file in **Mercato**, il modello può usare le partite a voto e la fantamedia della lega per la giornata immediatamente successiva. La probabilità di ricevere voto è il rapporto tra voti e gare concluse della squadra. Con almeno tre voti, ogni esito a voto usa la fantamedia del file. La variabilità del voto non si ricava da una sola media.
 
-Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. La tabella mostra il metodo impiegato e le eventuali esclusioni. Per le stime da voti l’indice basato su minuti ed eventi resta vuoto.
+Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. A parità di copertura ha precedenza il CSV di lega, seguito da Excel, FantaTB e statistiche di gioco. La tabella mostra il metodo impiegato e le eventuali esclusioni. Il calcolo dell’indice di schierabilità richiede le statistiche di gioco.
+
+## Previsione 1X2
+
+Il Match Center stima i gol di casa e trasferta dai risultati precedenti al giorno italiano della partita. Combina produzione offensiva della squadra e gol concessi dall’avversaria sul rispettivo campo. Le medie di campionato attenuano l’effetto dei piccoli campioni. Le gare 2025/26 di ogni squadra contribuiscono con un peso massimo di quattro partite equivalenti per campo. Le probabilità 1X2 si calcolano combinando due distribuzioni di Poisson. **Analisi** confronta Brier multicategoria e log loss con un Poisson basato sulle sole medie casa e trasferta di campionato.
 
 ## Simulazione Monte Carlo
 

@@ -142,3 +142,78 @@ export function readRosterCsv(text, { players, teams, mode }) {
   }
   return { entries, unresolved };
 }
+
+export function readVotesCsv(text, { players, teams }) {
+  const rows = parseRows(text);
+  const headers = (rows.shift() ?? []).map(normalized);
+  const columns = Object.fromEntries(['stagione','giornata','id fantalab','nome','squadra','ruolo','fantavoto','voto']
+    .map(key => [key, headers.indexOf(key)]));
+  const required = ['stagione','giornata','fantavoto'];
+  const byName = ['nome','squadra','ruolo'].every(key => columns[key] >= 0);
+  if (required.some(key => columns[key] < 0) || (columns['id fantalab'] < 0 && !byName)) {
+    throw new Error('Usa le intestazioni del modello CSV dei fantavoti.');
+  }
+  if (rows.length > 20_000) throw new Error('Il CSV supera 20.000 righe.');
+
+  const playersById = new Map(players.map(player => [player.id, player]));
+  const playersByIdentity = new Map();
+  for (const player of playersById.values()) {
+    const key = JSON.stringify([normalized(player.name), player.teamId, player.position]);
+    const candidates = playersByIdentity.get(key) ?? [];
+    candidates.push(player);
+    playersByIdentity.set(key, candidates);
+  }
+  const score = (raw, min, max) => {
+    if (!raw || ['sv','s v','senza voto'].includes(normalized(raw))) return null;
+    const value = /^-?\d+(?:[.,]\d+)?$/.test(raw) ? Number(raw.replace(',', '.')) : NaN;
+    return value >= min && value <= max ? value : NaN;
+  };
+  const seen = new Map();
+  const conflicts = new Set();
+  const unresolved = [];
+  for (const [index, row] of rows.entries()) {
+    const cell = key => row[columns[key]] ?? '';
+    const suppliedId = cell('id fantalab');
+    const label = (cell('nome') || suppliedId || 'Calciatore').slice(0,120);
+    const report = reason => unresolved.push({ line: index + 2, label, reason });
+    const season = cell('stagione');
+    const day = cell('giornata');
+    if (!['2025/26','2026/27'].includes(season) || !/^(?:[1-9]|[12]\d|3[0-8])$/.test(day)) {
+      report('Stagione o giornata non valida');
+      continue;
+    }
+    const clubs = cell('squadra') ? teamsForLabel(teams, cell('squadra')) : [];
+    const position = CLASSIC_ROLES[cell('ruolo').toUpperCase()];
+    const key = JSON.stringify([normalized(cell('nome')), clubs[0]?.id, position]);
+    const candidates = suppliedId ? [playersById.get(suppliedId)].filter(Boolean)
+      : byName && season === '2026/27' && clubs.length === 1 && position ? playersByIdentity.get(key) ?? [] : [];
+    if (candidates.length !== 1 || (cell('squadra') && clubs.length !== 1)) {
+      report(season === '2025/26' && !suppliedId ? 'Per il 2025/26 serve un ID FantaLab verificato' : 'Identità mancante o ambigua');
+      continue;
+    }
+    const [player] = candidates;
+    if (season === '2026/27' && clubs.length && clubs[0].id !== player.teamId ||
+        suppliedId && cell('nome') && normalized(cell('nome')) !== normalized(player.name) ||
+        suppliedId && cell('ruolo') && position !== player.position) {
+      report('I dati del calciatore discordano dall’ID FantaLab');
+      continue;
+    }
+    const rating = score(cell('voto'), 0, 10);
+    const fantasyRating = score(cell('fantavoto'), -20, 50);
+    if (row.length !== headers.length || Number.isNaN(rating) || Number.isNaN(fantasyRating) ||
+        (fantasyRating === null && rating !== null)) {
+      report('Voto o fantavoto non valido');
+      continue;
+    }
+    const entry = { id: player.id, season, round: Number(day),
+      teamId: clubs[0]?.id ?? (season === '2026/27' ? player.teamId : null), rating, fantasyRating };
+    const identity = JSON.stringify([entry.id, season, entry.round]);
+    const previous = seen.get(identity);
+    if (conflicts.has(identity) || previous && JSON.stringify(previous) !== JSON.stringify(entry)) {
+      seen.delete(identity);
+      conflicts.add(identity);
+      report('Voti discordanti per lo stesso calciatore e giornata');
+    } else seen.set(identity, entry);
+  }
+  return { entries: [...seen.values()], unresolved };
+}

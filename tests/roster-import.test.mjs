@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeRosterCsv, makeRosterCsvId, readRosterCsv } from '../js/roster-import.js';
+import { decodeRosterCsv, makeRosterCsvId, readRosterCsv, readVotesCsv } from '../js/roster-import.js';
 
 const teams = [
   { id: 'valleverde', name: 'AC Valleverde', shortName: 'Valleverde', code: 'VVD' },
@@ -18,6 +18,23 @@ const players = [
 const input = { players, teams, mode: 'real' };
 const fantaHeader = 'Ruolo;Nome;Squadra;Costo d\'acquisto;Quotazione Attuale;FVMp;Media Voto;Fanta Media;Partite Giocate (a voto);Prestito';
 const fantacalcio = (...rows) => `\uFEFF${[fantaHeader, ...rows].join('\r\n')}`;
+
+test('reads matchday votes locally, preserves explicit SV and excludes conflicting rows', () => {
+  const result = readVotesCsv([
+    'Stagione;Giornata;ID FantaLab;Nome;Squadra;Ruolo;Fantavoto;Voto',
+    '2026/27;1;;Álvaro Di Fronzo;VVD;A;8,25;6,25',
+    '2026/27;2;a1;;;;SV;',
+    '2026/27;3;a1;;;;7;',
+    '2026/27;3;a1;;;;9;',
+    '2025/26;5;a1;;;;6,5;',
+    '2025/26;6;;Álvaro Di Fronzo;VVD;A;7;',
+    '2026/27;6;;DI FRONZO;VVD;A;7;',
+  ].join('\r\n'), input);
+  assert.deepEqual(result.entries.map(row => [row.season,row.round,row.id,row.rating,row.fantasyRating]), [
+    ['2026/27',1,'a1',6.25,8.25], ['2026/27',2,'a1',null,null], ['2025/26',5,'a1',null,6.5]
+  ]);
+  assert.equal(result.unresolved.length, 3);
+});
 
 test('reads Fantacalcio headers, comma decimals, roles and abbreviation aliases in CSV order', () => {
   const result = readRosterCsv(fantacalcio('D;FERRIN;VVD;3;4;23;6,10;6,80;9;NO', 'A;DIFRONZO A;Valleverde;31;35;99;6,6;8,0;9;SI', 'P;FERRÍN;AS Rivera'), input);
