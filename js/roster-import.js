@@ -87,11 +87,21 @@ function abbreviatedNameMatches(playerName, inputName) {
   const matchingInitial = inputWords.length > 1 && inputWords.at(-1) === words[0][0];
   const inputSurname = inputWords.slice(0, -1).join('');
   if (words.join('') === input) return true;
+  const leadingInitial = inputWords.length > 1 && inputWords[0].length === 1 && inputWords[0] === words[0][0];
   for (let index = 1; index < words.length; index++) {
     const suffix = words.slice(index).join('');
     if (suffix === input || (matchingInitial && suffix === inputSurname)) return true;
+    if (leadingInitial && suffix === inputWords.slice(1).join('')) return true;
+    const initials = words.slice(0, index).map(word => word[0]).join('');
+    if (input === suffix + initials) return true;
   }
   return false;
+}
+
+export function matchClassicPlayerName(name, candidates) {
+  const exact = candidates.filter(player => normalized(player.name) === normalized(name));
+  return exact.length ? exact : candidates.filter(player =>
+    abbreviatedNameMatches(player.name, name) || abbreviatedNameMatches(name, player.name));
 }
 
 export function readRosterCsv(text, { players, teams, mode }) {
@@ -133,9 +143,8 @@ export function readRosterCsv(text, { players, teams, mode }) {
       continue;
     }
 
-    const candidates = exact.length
-      ? exact.filter(player => player.position === position)
-      : inScope.filter(player => player.position === position && abbreviatedNameMatches(player.name, name));
+    const candidates = exact.length ? exact.filter(player => player.position === position)
+      : matchClassicPlayerName(name, inScope.filter(player => player.position === position));
     if (candidates.length === 1) entries.push({ id: candidates[0].id, localId });
     else if (candidates.length > 1) unresolved.push({ label, reason: 'Più corrispondenze con la stessa squadra e lo stesso ruolo' });
     else entries.push({ id: localId, local: { id: localId, name, teamId, position } });

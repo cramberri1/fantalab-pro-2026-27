@@ -11,6 +11,18 @@ import { manualAvailabilityRecord, sanitizeManualAvailability, renderManualAvail
 import { buildFixtureDifficulty, renderFixtureDifficulty } from './fixture-difficulty.js';
 import { suggestLineup } from './lineup-suggestion.js';
 import { evaluateLineupPerformance } from './lineup-performance.js';
+import { OFFICIAL_VOTE_EDITIONS, officialVotesSeason, readOfficialVotesWorkbook, bindOfficialVoteRows } from './official-votes.js';
+import { buildOfficialVoteIndex } from './official-vote-model.js';
+import { cleanOfficialArchive, readOfficialArchive, writeOfficialArchive } from './official-vote-storage.js';
+import { renderPanoramica } from './view-panoramica.js';
+import { renderMatch } from './view-match.js';
+import { renderGiocatori } from './view-giocatori.js';
+import { renderAnalisi } from './view-analisi.js';
+import { renderRosa } from './view-rosa.js';
+import { renderMercato } from './view-mercato.js';
+import { renderSimulazione } from './view-simulazione.js';
+import { renderRendimento } from './view-rendimento.js';
+import { renderFonti } from './view-fonti.js';
 
 const PAGES = {
   panoramica: 'Panoramica', match: 'Match Center', giocatori: 'Calciatori', analisi: 'Analisi',
@@ -74,6 +86,12 @@ let votesReport;
 let votesImport = readVotesImport();
 let votesByPlayer = indexVotes(votesImport);
 let votesImportVersion = 0;
+let officialArchive = { edition:'Fantacalcio', days:[], revision:0 };
+let officialCache;
+let officialLoaded = false;
+let officialBusy = false;
+let officialMessage = '';
+let officialPending;
 let historicalArchive;
 let historicalError = false;
 let historicalRequest;
@@ -199,7 +217,8 @@ function sanitizeForecasts(value) {
         !Array.isArray(raw.reserves)) continue;
     const players = rows => rows.filter(p => p && typeof p.id === 'string' && p.id.length <= 120 &&
       typeof p.name === 'string' && Object.hasOwn(ROLES,p.position)).map(p => ({
-      id:p.id, name:p.name.slice(0,120), position:p.position, expectedPoints:Number.isFinite(p.expectedPoints) ? p.expectedPoints : null
+      id:p.id, name:p.name.slice(0,120), position:p.position, teamId:typeof p.teamId === 'string' ? p.teamId.slice(0,50) : undefined,
+      expectedPoints:Number.isFinite(p.expectedPoints) ? p.expectedPoints : null
     }));
     const starters = players(raw.starters);
     if (starters.length !== 11 || new Set(starters.map(p => p.id)).size !== 11) continue;
@@ -209,7 +228,7 @@ function sanitizeForecasts(value) {
       starters, reserves, coverage:Number.isFinite(raw.coverage) ? Math.max(0,Math.min(1,raw.coverage)) : null,
       complete:raw.complete === true, method:typeof raw.method === 'string' ? raw.method.slice(0,50) : null,
       source:typeof raw.source === 'string' ? raw.source.slice(0,120) : null,
-      sourceId:typeof raw.sourceId === 'string' ? raw.sourceId.slice(0,120) : null,
+      sourceId:typeof raw.sourceId === 'string' ? raw.sourceId.slice(0,250) : null,
       maxSubstitutions:Number.isInteger(raw.maxSubstitutions) ? Math.max(0,Math.min(5,raw.maxSubstitutions)) : 3 };
   }
   return forecasts;
@@ -383,34 +402,10 @@ function roundPreview(day, title, note = '') {
   </div>${fixtureList(fixtures)}</section>`;
 }
 function panoramica() {
-  const calendar = getRoundWindow(dataset);
-  const isNext = calendar.next === round;
-  const isLatest = calendar.latest === round;
-  const nextTitle = calendar.nextStarted ? 'Giornata in corso' : 'Prossima giornata';
-  const recentTitle = calendar.latestComplete ? 'Ultima giornata giocata' : 'Ultima giornata con risultati';
-  const recentNote = calendar.latestComplete ? '' : ' · risultati parziali';
-  const selectedTitle = isNext ? nextTitle : isLatest ? recentTitle : 'Giornata selezionata';
-  const finalCount = dataset.fixtures.filter(f => f.status === 'played').length;
-  const ready = dataset.players.filter(p => p.ratings?.some(vote => Number.isFinite(vote.fantasyRating))
-    || Number.isFinite(p.minutes) && Number.isFinite(p.appearances)).length;
-  const rosterCount = groupPlayers(modeState().roster).length;
-  return `<section class="hero" aria-labelledby="overview-title">
-    <div class="hero-image" aria-hidden="true"></div><div class="eyebrow">Serie A 2026/27 · Giornata ${round}</div>
-    <h1 id="overview-title">FantaLab Pro</h1>
-    <p>Analizza gli incroci della giornata, consulta le statistiche e prepara la tua formazione.</p>
-    <div class="hero-actions"><a class="btn primary" href="#match">Apri Match Center ${iconSpan('arrow')}</a><a class="btn" href="#rosa">Vai alla rosa</a></div>
-  </section>
-  <section class="metrics" aria-label="Stato della stagione">
-    ${metric('Risultati acquisiti', `${number(finalCount)}<small> / ${number(dataset.fixtures.length)}</small>`, 'Partite con risultato finale', 'pitch')}
-    ${metric('Calciatori nel listone', number(dataset.players.length), `${number(ready)} con fantavoti o dati di gioco`, 'users')}
-    ${metric('La tua rosa', number(rosterCount), 'Calciatori salvati in questa modalità', 'shirt')}
-  </section>
-  <div class="split overview-rounds">
-    ${roundPreview(round, selectedTitle, isLatest ? recentNote : '')}
-    ${calendar.latest != null && !isLatest ? roundPreview(calendar.latest, recentTitle, recentNote)
-      : calendar.next != null && !isNext ? roundPreview(calendar.next, nextTitle) : ''}
-  </div>
-  <section class="panel overview-coverage"><div class="panel-head"><h2>Copertura dati</h2><a class="text-link" href="#fonti">Vedi fonti →</a></div>${coverageRows(['fixtures','results','players','ratings','teamExpectedGoals','expectedGoals','expectedAssists','absences'])}</section>`;
+  return renderPanoramica({
+    dataset, round, getRoundWindow, groupPlayers, modeState, iconSpan, metric, number, roundPreview,
+    coverageRows
+  });
 }
 function previousForm(teamId, fixture) {
   const cutoff = fixtureCalendarDay(fixture);
@@ -486,24 +481,10 @@ function matchCard(fixture) {
       <div class="actions"><button data-club="${html(fixture.homeId)}">${html(getTeam(fixture.homeId)?.shortName ?? 'Casa')}</button><button data-club="${html(fixture.awayId)}">${html(getTeam(fixture.awayId)?.shortName ?? 'Trasferta')}</button></div></div>`;
 }
 function match() {
-  const fixtures = byRound();
-  const current = fixtures.find(f => f.id === selectedFixtureId) ?? fixtures[0];
-  const allRounds = rounds();
-  const index = allRounds.indexOf(round);
-  const calendar = getRoundWindow(dataset);
-  const shortcuts = [
-    [calendar.next, calendar.nextStarted ? 'Giornata in corso' : 'Prossima giornata'],
-    [calendar.latest, calendar.latestComplete ? 'Ultima giornata giocata' : 'Ultima giornata con risultati']
-  ].filter(([day]) => day != null);
-  return `${heading('Match Center', 'Calendario, risultati, rendimento recente e difficoltà per reparto.')}
-    ${shortcuts.length ? `<div class="actions calendar-shortcuts" role="group" aria-label="Scorciatoie giornate">
-      ${shortcuts.map(([day, label]) => `<button type="button" data-round="${day}" aria-pressed="${round === day}">${label} · G${day}</button>`).join('')}
-    </div>` : ''}
-    <div class="split">
-      <section class="panel"><div class="panel-head"><div><h2>Giornata ${round}</h2><p>Orari italiani quando disponibili</p></div><div class="actions"><button data-round="${allRounds[index - 1] ?? ''}" aria-label="Giornata precedente" ${index <= 0 ? 'disabled' : ''}>←</button>
-        <button data-round="${allRounds[index + 1] ?? ''}" aria-label="Giornata successiva" ${index === allRounds.length - 1 ? 'disabled' : ''}>→</button></div></div>${fixtureList(fixtures, current?.id)}</section>
-      <section class="panel" id="match-detail" aria-label="Dettaglio incontro">${matchCard(current)}</section>
-    </div><div id="fixture-difficulty">${renderFixtureDifficulty(difficultyGrid(), { html, number })}</div>`;
+  return renderMatch({
+    dataset, round, selectedFixtureId, byRound, rounds, getRoundWindow, heading, fixtureList, matchCard,
+    renderFixtureDifficulty, difficultyGrid, html, number
+  });
 }
 function difficultyGrid() {
   const asOf = Date.now();
@@ -527,7 +508,8 @@ function playerAnalysis(player, method) {
     fantasySample: leagueFantasySamples().get(player.id),
     leagueVotes: mode === 'real' ? votesByPlayer.get(player.id) : undefined,
     manualAvailability: manualAvailabilityFor(player.id), method, scoring: modeState().scoring,
-    penaltyTaker: modeState().penaltyTakers.includes(player.id)
+    penaltyTaker: modeState().penaltyTakers.includes(player.id),
+    officialVotes: mode === 'real' ? officialVoteIndex() : undefined
   });
 }
 function playerList() {
@@ -576,19 +558,9 @@ function comparison() {
     ${Object.entries(metrics).map(([label, value]) => `<tr><th scope="row">${label}</th>${candidates.map(p => `<td class="numeric">${value(p)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
 }
 function giocatori() {
-  const teams = [...dataset.teams].sort((a,b) => a.shortName.localeCompare(b.shortName, 'it'));
-  return `${heading('Calciatori', 'Apri una scheda per vedere numeri stagionali, andamento e motivi dell’indice di schierabilità.',
-      mode === 'real' ? '<button data-market-tab="listone">Apri listone della lega</button>' : '')}
-    <section class="panel">
-      <div class="filters">
-        <input id="player-search" type="search" aria-label="Cerca calciatore" placeholder="Cerca per nome o squadra" value="${html(filters.search)}">
-        <select id="player-position" aria-label="Filtra per ruolo"><option value="">Tutti i ruoli</option>${Object.entries(ROLES).map(([id, name]) => `<option value="${id}" ${id === filters.position ? 'selected' : ''}>${name}</option>`).join('')}</select>
-        <select id="player-team" aria-label="Filtra per squadra"><option value="">Tutte le squadre</option>${teams.map(t => `<option value="${html(t.id)}" ${t.id === filters.team ? 'selected' : ''}>${html(t.shortName)}</option>`).join('')}</select>
-        <select id="player-sort" aria-label="Ordina calciatori">${[['name','Nome'],['index','Schierabilità'],['xg','xG'],['xa','xA'],['minutes','Minuti'],['goals','Gol']].map(([key, label]) => `<option value="${key}" ${key === filters.sort ? 'selected' : ''}>Ordina per ${label}</option>`).join('')}</select>
-      </div>
-      <p class="inline-status">Il trattino indica un dato mancante. ${mode === 'real' ? '<a class="text-link" href="#fonti">Verifica copertura e fonti</a>' : ''}</p><div id="player-list">${playerList()}</div>
-    </section>
-    <div id="comparison">${comparison()}</div>`;
+  return renderGiocatori({
+    dataset, mode, heading, html, filters, ROLES, playerList, comparison
+  });
 }
 function stat(label, value) {
   return `<div class="detail-stat"><small>${label}</small><strong>${value}</strong></div>`;
@@ -657,11 +629,13 @@ function showPlayer(id) {
       ${stat('Fantapunti attesi', number(a.expectedPoints, 2))}</div>
       ${projected?.method ? status(projectionLabel(projected.method), 'partial') : ''}
       ${a.indexMethod === 'league-average' ? '<p class="muted">Indice basato sul campione di voti Excel.</p>' : ''}
+      ${a.indexMethod === 'official-history' ? '<p class="muted">Indice basato sui voti di giornata importati.</p>' : ''}
       ${components.map(c => `<div class="duel"><strong>${html(c.label)} · ${number(c.value)}/100</strong><div class="meter" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, c.value))}%"></span></div><p>Peso effettivo ${number(c.effectiveWeight)}% · contributo ${number(c.contribution, 1)} punti. ${html(c.detail)}</p></div>`).join('')}
       ${a.notes.length ? `<ul class="muted">${a.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
     </section>
     ${renderManualAvailability({ player: p, round, record: manualAvailabilityFor(p.id), html })}
     <label class="field-label"><span><input type="checkbox" data-penalty-taker="${html(p.id)}" ${modeState().penaltyTakers.includes(p.id) ? 'checked' : ''}> Rigorista</span></label>
+    ${officialPlayerHistory(p)}
     ${renderFixtureDifficulty(teamDifficulty(p.teamId), { html, number, compact: true })}
     ${games.length ? `<section class="dialog-section"><h3>xG e xA per giornata</h3>${historyChart(games, ['xg','xa'], ['xG','xA'], 1, 'Andamento xG e xA')}</section>` : ''}
     ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>
@@ -853,70 +827,12 @@ function pitch(record, validation, context) {
   }).join('')}</div>`;
 }
 function rosa() {
-  const state = modeState();
-  const record = lineup();
-  const starters = groupPlayers(record.starters);
-  const roster = groupPlayers(state.roster);
-  const validation = validateLineup(starters, record.formation);
-  const reserves = groupPlayers(record.reserves);
-  const context = playerContexts(roster);
-  const penaltyTakers = new Set(state.penaltyTakers);
-  for (const [id, item] of context) {
-    item.manual = manualAvailabilityFor(id);
-    item.penaltyTaker = penaltyTakers.has(id);
-  }
-  const previous = previousLineup();
-  const copy = previous?.record;
-  const choices = dataset.players.filter(p => !state.roster.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'it'));
-  const presetButton = mode === 'demo' && dataset.demoPreset
-    ? '<button class="primary" data-load-preset>Carica rosa demo</button>'
-    : '<a class="btn" href="#mercato">Apri il mercato</a>';
-  return `${heading('La mia rosa', 'Organizza titolari e panchina per giornata. Le modifiche vengono salvate su questo browser.', presetButton)}
-  <p class="inline-status lineup-help">Trascina un calciatore oppure selezionalo e scegli dove metterlo. Per sostituire un titolare, scegli un calciatore dello stesso ruolo.</p>
-  <p class="lineup-selection" id="lineup-selection" role="status"></p>
-  <div class="split lineup-board">
-    <section class="panel lineup-roster"><div class="panel-head"><div><h2>Rosa</h2><p>${roster.length} calciatori</p></div><a class="text-link" href="#giocatori">Apri il listone →</a></div>
-      ${choices.length ? `<form class="roster-add" id="roster-add"><label class="field-label">Aggiungi dal listone<select id="roster-choice" required><option value="">Seleziona calciatore</option>${choices.map(p => `<option value="${html(p.id)}">${html(p.name)} · ${html(getTeam(p.teamId)?.shortName)} · ${SHORT[p.position] ?? '—'}</option>`).join('')}</select></label><button type="submit">Aggiungi</button></form>` : ''}
-      ${roster.length ? `<ul class="roster-list" data-lineup-scroll>${roster.map(p => {
-        const active = record.starters.includes(p.id) ? 'starter' : record.reserves.includes(p.id) ? 'reserve' : 'none';
-        return `<li><button type="button" class="lineup-handle" ${dragAttributes(p)} aria-label="Sposta ${html(p.name)}"><span aria-hidden="true">⠿</span><span aria-hidden="true">${SHORT[p.position] ?? '—'}</span></button><div class="lineup-roster-player"><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>${lineupContextLabel(context.get(p.id))}</div>
-          ${p.id.startsWith('csv:') ? status('Da CSV · senza statistiche', 'partial') : ''}
-          <select data-lineup-role="${html(p.id)}" aria-label="Impiego di ${html(p.name)}">${[['none','Fuori'],['starter','Titolare'],['reserve','Panchina']].map(([key,label]) => `<option value="${key}" ${key === active ? 'selected' : ''}>${label}</option>`).join('')}</select>
-          <button data-remove="${html(p.id)}" aria-label="Rimuovi ${html(p.name)}">✕</button></li>`;
-      }).join('')}</ul>` : empty('Aggiungi calciatori dal listone o importa un CSV.')}
-      ${state.roster.length !== roster.length ? `<p class="inline-status">${state.roster.length - roster.length} ID salvati non compaiono nello snapshot corrente. Restano nel backup.</p>` : ''}
-      <div class="file-actions"><label class="btn button-file">Importa rosa CSV<input type="file" accept=".csv,text/csv" id="roster-csv" aria-label="Importa rosa CSV"></label>
-      <button data-csv-template>Modello CSV</button><button data-export>Esporta backup</button>
-      <label class="btn button-file">Importa backup<input type="file" accept=".json,application/json" id="backup-json" aria-label="Importa backup"></label></div>
-      <p class="inline-status">Puoi usare l’export Classic di Fantacalcio.it o il modello CSV. L’importazione aggiunge i calciatori alla rosa salvata.</p>
-      ${importReport ? `<div class="notice neutral"><p role="status">${html(importReport.message)}</p>
-        ${importReport.unresolved?.length ? `<details><summary>Righe da verificare</summary><ul>
-          ${importReport.unresolved.slice(0, 50).map(row => `<li>${html(row.label)} · ${html(row.reason)}</li>`).join('')}
-          ${importReport.unresolved.length > 50 ? '<li>Mostrate le prime 50 righe.</li>' : ''}
-        </ul></details>` : ''}</div>` : ''}
-    </section>
-    <section class="panel lineup-formation">
-      <div class="panel-head"><div><h2>Formazione</h2><p>Giornata ${round}</p></div>${status(validation.valid ? '11 titolari validi' : `${starters.length} / 11 titolari`, validation.valid ? 'available' : 'partial')}</div>
-      <div class="actions lineup-actions">
-        ${copy ? `<button type="button" data-lineup-copy>Copia formazione G${round - 1}</button>` : ''}
-        <button type="button" data-lineup-undo ${lineupUndo[mode].has(round) ? '' : 'disabled'}>Annulla ultima modifica</button>
-        <button type="button" data-lineup-suggest ${roster.length < 11 ? 'disabled' : ''}>Suggerisci formazione</button>
-      </div>
-      ${suggestionPanel()}
-      ${copy && lineupCopyPreview ? `<div class="notice neutral lineup-copy-preview"><p>La formazione della G${round - 1} sostituirà quella attuale. Modulo ${html(copy.formation)}, ${copy.starters.length} titolari, ${copy.reserves.length} riserve e ${copy.maxSubstitutions} cambi.${previous.missing ? ` ${previous.missing} calciatori non sono più disponibili nella rosa.` : ''}</p>
-        <div class="actions"><button type="button" data-lineup-copy-confirm>Sostituisci formazione</button><button type="button" data-lineup-copy-cancel>Mantieni quella attuale</button></div></div>` : ''}
-      <div class="lineup-controls"><label class="field-label">Modulo<select id="formation">${FORMATION_OPTIONS.map(f => `<option value="${f}" ${f === record.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
-        <label class="field-label">Max cambi<select id="substitutions">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${n === record.maxSubstitutions ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-      ${pitch(record, validation, context)}
-      ${!validation.valid && starters.length ? `<p class="inline-status">${html(validation.errors.join(' '))}</p>` : ''}
-      <div class="duel lineup-bench"><h3>Panchina</h3><p>Priorità dall’alto verso il basso. Sostituzioni fra calciatori dello stesso ruolo.</p>
-      ${reserves.length ? `<ol class="bench">${reserves.map((p, i) => `<li data-lineup-drop="reserve" data-drop-player="${html(p.id)}"><button type="button" class="bench-player" ${dragAttributes(p)}><span aria-hidden="true">⠿</span> ${html(p.name)} <small>${SHORT[p.position] ?? '—'}</small>${lineupContextLabel(context.get(p.id), true)}</button><button data-reserve="${html(p.id)}" data-move="-1" aria-label="Sposta ${html(p.name)} in alto" ${i === 0 ? 'disabled' : ''}>↑</button><button data-reserve="${html(p.id)}" data-move="1" aria-label="Sposta ${html(p.name)} in basso" ${i === reserves.length - 1 ? 'disabled' : ''}>↓</button></li>`).join('')}</ol>` : ''}
-      <button class="lineup-drop-button" type="button" data-lineup-drop="reserve" data-drop-append>Aggiungi in coda</button></div>
-      <button class="lineup-drop-button lineup-drop-out" type="button" data-lineup-drop="none">Fuori formazione</button>
-      <a class="btn primary" href="#simulazione">Vai alla simulazione ${iconSpan('arrow')}</a>
-      <a class="btn quiet" href="#match" data-show-difficulty>Difficoltà prossime giornate</a>
-    </section>
-  </div>`;
+  return renderRosa({
+    modeState, lineup, groupPlayers, validateLineup, playerContexts, manualAvailabilityFor,
+    previousLineup, dataset, mode, heading, html, getTeam, SHORT, dragAttributes, lineupContextLabel,
+    status, empty, importReport, lineupUndo, round, suggestionPanel, lineupCopyPreview, FORMATION_OPTIONS,
+    pitch, iconSpan, officialArchive
+  });
 }
 function playerContexts(players) {
   return buildLineupContext(players, { fixtures: dataset.fixtures, absences: dataset.absences, round,
@@ -977,12 +893,25 @@ function importCsv(text) {
   const linkedSummary = linked ? ` ${linked} voci da CSV collegate al listone.` : '';
   return { message: counts + localSummary + linkedSummary, unresolved };
 }
-function restoreBackup(text) {
+async function restoreBackup(text) {
   const file = JSON.parse(text);
   if (file?.schemaVersion !== 1 || file.season !== '2026/27' || !file.state || typeof file.state !== 'object') {
     throw new Error('Questo file non è un backup FantaLab Pro 2026/27.');
   }
   const incoming = sanitizeBackup(file.state);
+  if (file.officialVotes) {
+    if (!officialLoaded || officialBusy) throw new Error('Attendi che l’archivio voti sia disponibile e riprova.');
+    const imported = cleanOfficialArchive(file.officialVotes);
+    if (!Array.isArray(file.officialVotes.days) || imported.days.length !== file.officialVotes.days.length) {
+      throw new Error('Il backup contiene un archivio voti non valido.');
+    }
+    officialBusy = true;
+    try {
+      const days = new Map(imported.days.map(day => [`${day.season}:${day.round}`,day]));
+      for (const day of officialArchive.days) days.set(`${day.season}:${day.round}`,day);
+      await updateOfficialArchive({ edition: officialArchive.days.length ? officialArchive.edition : imported.edition, days:[...days.values()] });
+    } finally { officialBusy = false; }
+  }
   let kept = 0;
   for (const m of ['real', 'demo']) {
     const base = storage[m];
@@ -1055,6 +984,168 @@ function setVotesImport(imported) {
     return true;
   } catch { return false; }
 }
+function officialVoteIndex() {
+  const scoring = modeState().scoring;
+  if (officialCache?.archive !== officialArchive || officialCache.scoring !== scoring) {
+    officialCache = { archive:officialArchive, scoring, index:buildOfficialVoteIndex(officialArchive.days, {
+      edition:officialArchive.edition, scoring:sanitizeScoring(scoring)
+    }) };
+  }
+  return officialCache.index;
+}
+function officialSourceKey(official) {
+  return `${official.sourceId}:${JSON.stringify(Object.values(sanitizeScoring(modeState().scoring)))}`;
+}
+async function openOfficialArchive() {
+  try { officialArchive = await readOfficialArchive(); }
+  catch { officialMessage = 'L’archivio locale non è accessibile in questo browser.'; }
+  officialLoaded = true;
+  if (dataset && mode === 'real') {
+    invalidateLineupResults();
+    render();
+  }
+}
+async function updateOfficialArchive(next) {
+  const checked = cleanOfficialArchive(next);
+  if (checked.days.length !== next.days.length) throw new Error('Archivio voti non valido.');
+  try {
+    const revision = await writeOfficialArchive(checked, officialArchive.revision);
+    officialArchive = { ...checked, revision };
+  } catch (error) {
+    if (error.code === 'ARCHIVE_CHANGED') {
+      officialArchive = await readOfficialArchive();
+      invalidateLineupResults();
+    }
+    throw error;
+  }
+  invalidateLineupResults();
+}
+function officialBinding(season) {
+  const players = [...dataset.players,...Object.values(modeState().rosterLocals)];
+  const teams = season === dataset.season ? dataset.teams : historicalArchive?.teams;
+  if (!teams?.length) throw new Error('Archivio delle squadre della stagione precedente non disponibile.');
+  return { teams, players, listone:season === dataset.season ? marketImports.listone?.rows : [] };
+}
+async function importOfficialFiles(files, confirmedSeason) {
+  if (!officialLoaded || officialBusy || !files.length) return;
+  if (files.length > 38) {
+    officialMessage = 'Carica al massimo 38 file alla volta.';
+    refreshOfficialPanel();
+    return;
+  }
+  officialBusy = true;
+  officialPending = undefined;
+  officialMessage = 'Lettura dei file nel browser…';
+  refreshOfficialPanel();
+  try {
+    const days = new Map(officialArchive.days.map(day => [`${day.season}:${day.round}`, day]));
+    const issues = [];
+    let imported = 0;
+    let replaced = 0;
+    const pending = [];
+    for (const file of files) {
+      try {
+        if (!/\.xlsx$/i.test(file.name) || file.size > 8_000_000) throw new Error('Usa un file XLSX fino a 8 MB.');
+        const detected = officialVotesSeason(file.name);
+        if (!confirmedSeason && detected !== dataset.season) { pending.push(file); continue; }
+        const season = confirmedSeason ?? dataset.season;
+        if (detected && detected !== season) throw new Error(`Il nome del file indica la stagione ${detected}. Conferma la stagione corrispondente.`);
+        if (season !== dataset.season) await loadHistoricalArchive();
+        const day = await readOfficialVotesWorkbook(await file.arrayBuffer(), {
+          filename:file.name, season:dataset.season, confirmedSeason, ...officialBinding(season)
+        });
+        const key = `${day.season}:${day.round}`;
+        if (days.has(key)) replaced++;
+        days.set(key, day);
+        imported++;
+      } catch (error) { issues.push(`${file.name.slice(0,100)} · ${error.message}`); }
+    }
+    if (imported) await updateOfficialArchive({ ...officialArchive, days:[...days.values()] });
+    officialPending = pending.length ? pending : undefined;
+    const summary = imported ? `${imported} giornate importate${replaced ? ` · ${replaced} sostituite` : ''}.` : '';
+    officialMessage = [summary, ...issues].filter(Boolean).join(' ');
+  } catch (error) { officialMessage = error.message; }
+  finally {
+    officialBusy = false;
+    refreshOfficialPanel();
+  }
+}
+function refreshOfficialPanel() {
+  const panel = $('#official-votes-panel');
+  if (panel) panel.outerHTML = officialVotesPanel();
+}
+async function updateOfficialSettings({ edition, remove, relink }) {
+  if (!officialLoaded || officialBusy) return;
+  officialBusy = true;
+  try {
+    let days = officialArchive.days;
+    if (remove) days = days.filter(day => `${day.season}:${day.round}` !== remove);
+    if (relink) days = days.map(day => {
+      if (day.season !== dataset.season) return day;
+      return { ...day, ...bindOfficialVoteRows(day.rows, { ...officialBinding(day.season), readRows:day.readRows }) };
+    });
+    await updateOfficialArchive({ edition:edition ?? officialArchive.edition, days });
+    officialMessage = remove ? 'Giornata rimossa.' : relink ? 'Abbinamenti aggiornati.' : 'Redazione salvata.';
+  } catch (error) { officialMessage = error.message; }
+  finally {
+    officialBusy = false;
+    refreshOfficialPanel();
+  }
+}
+function officialVotesPanel() {
+  const days = [...officialArchive.days].sort((first, second) => second.season.localeCompare(first.season) || second.round - first.round);
+  const latest = days.find(day => day.season === dataset.season);
+  return `<section class="panel stacked official-votes" id="official-votes-panel"><div class="panel-head">
+    <div><h2>Voti di giornata Fantacalcio.it</h2><p>File ad uso personale: restano nel tuo browser.</p></div>
+    ${latest ? status(`Voti caricati fino alla giornata ${latest.round}`, 'available') : ''}</div>
+    <div class="form-fields"><label class="field-label">Redazione della lega<select id="official-votes-edition" ${officialBusy || !officialLoaded ? 'disabled' : ''}>
+      ${OFFICIAL_VOTE_EDITIONS.map(edition => `<option ${edition === officialArchive.edition ? 'selected' : ''}>${edition}</option>`).join('')}</select></label>
+      <label class="btn button-file">Carica Excel voti<input id="official-votes-files" aria-label="Carica Excel voti" type="file" multiple accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ${officialBusy || !officialLoaded ? 'disabled' : ''}></label>
+      ${days.length ? '<button type="button" data-official-relink>Ricollega al listone</button>' : ''}</div>
+    <div id="official-votes-drop" class="official-drop">Trascina qui uno o più file XLSX scaricati da Fantacalcio.it.</div>
+    ${officialPending ? `<form id="official-votes-confirm" class="form-fields"><label class="field-label">Conferma stagione di ${officialPending.length} file
+      <select id="official-votes-season" name="season"><option value="">Scegli stagione</option>
+      <option>2026/27</option><option>2025/26</option></select></label><button type="submit">Importa file confermati</button>
+      <button type="button" data-official-cancel>Annulla</button></form>` : ''}
+    ${officialMessage ? `<p class="inline-status" role="status">${html(officialMessage)}</p>` : ''}
+    ${days.map(day => {
+      const ambiguous = day.unmatched.filter(row => row.ambiguous).length;
+      const matched = day.rows.filter(row => row.id).length;
+      return `<div class="duel official-day"><div class="panel-head"><div><h3>Giornata ${day.round} · ${html(day.season)}</h3>
+      <p>${day.complete ? 'Completa' : 'Parziale'} · ${day.teamIds.length}/20 squadre · ${html(officialArchive.edition)}</p></div>
+      <button type="button" data-official-remove="${day.season}:${day.round}" aria-label="Rimuovi voti giornata ${day.round} ${day.season}">Rimuovi</button></div>
+      <p>${day.readRows} letti · ${matched} abbinati · ${day.unmatched.length - ambiguous} non abbinati · ${ambiguous} ambigui · ${day.ignoredCoaches} allenatori esclusi.</p>
+      ${Number.isFinite(day.codeCoverage) ? `<p>Codici coerenti con il listone · ${number(day.codeCoverage * 100,2)}%.</p>` : ''}
+      ${day.warnings.map(warning => `<p class="inline-status">${html(warning)}</p>`).join('')}
+      ${day.unmatched.length ? `<details><summary>Righe da verificare</summary><ul>${day.unmatched.map(row =>
+        `<li>${html(row.name)} · ${html(getTeam(row.teamId)?.shortName ?? row.teamId)} · ${html(row.reason)}</li>`).join('')}</ul></details>` : ''}</div>`;
+    }).join('')}
+  </section>`;
+}
+const OFFICIAL_EVENT_LABELS = {
+  goals:'Gol', penaltyScored:'Rigore segnato', penaltySaved:'Rigore parato', penaltyMissed:'Rigore sbagliato',
+  ownGoal:'Autogol', goalsConceded:'Gol subiti', yellowCard:'Ammonizione', redCard:'Espulsione', assist:'Assist'
+};
+function officialPlayerHistory(player) {
+  if (mode !== 'real' || !officialArchive.days.length) return '';
+  const index = officialVoteIndex();
+  const current = index.history(player, dataset.season);
+  const historic = index.history(player, '2025/26');
+  const rows = [...current, ...historic];
+  if (!rows.length) return '';
+  const candidate = current.some(row => row.events?.penaltyScored + row.events?.penaltyMissed > 0);
+  const chart = (season, observations) => observations.length ? `<h4>${season} · ${observations.filter(row => Number.isFinite(row.rating)).length}/${observations.length} a voto</h4>
+      ${historyChart(observations, ['rating','fantasyRating'], ['Voto','Fantavoto'], 8, `Andamento voti ${season}`)}
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Eventi di giornata ${season}"><table><thead><tr><th>Giornata</th><th>Voto</th><th>Fantavoto</th><th>Eventi</th></tr></thead><tbody>
+      ${observations.map(row => `<tr><th scope="row">G${row.round}</th><td>${row.rating === null ? 'SV' : number(row.rating,1) + (row.starred ? '*' : '')}</td>
+        <td>${number(row.fantasyRating,2)}</td><td>${row.events ? Object.entries(row.events).filter(([,count]) => count > 0).map(([key,count]) => `${OFFICIAL_EVENT_LABELS[key]} ×${count}`).join(' · ') || '—' : '—'}</td></tr>`).join('')}
+      </tbody></table></div>` : '';
+  return `<section class="dialog-section official-player-history"><h3>Voti di giornata Fantacalcio.it</h3>
+    <p>${html(index.source)}. Fantavoto calcolato con il regolamento Classic salvato.</p>
+    ${candidate ? '<p>Possibile rigorista dai rigori segnati o sbagliati acquisiti. Puoi confermare con il flag Rigorista.</p>' : ''}
+    ${rows.some(row => row.starred) ? '<p>Il significato dell’asterisco non è documentato nel file. Questi voti sono esclusi dal calcolo della variabilità.</p>' : ''}
+    ${chart(dataset.season,current)}${chart('2025/26',historic)}</section>`;
+}
 function votesPanel() {
   return `<section class="panel"><div class="panel-head"><h2>Fantavoti della lega</h2>
     ${votesImport ? status(`${number(votesImport.rows.length)} righe`, 'available') : ''}</div>
@@ -1085,6 +1176,7 @@ async function importVotesFile(file, source) {
 }
 
 const PROJECTION_LABELS = {
+  'official-history': 'Voti di giornata Fantacalcio.it',
   'league-history': 'Fantavoti CSV della lega',
   'fantatb-history': 'Storico FantaTB',
   'league-average': 'Fantamedia Excel',
@@ -1137,6 +1229,7 @@ function scoringOptions() {
   const prior = mode === 'real' ? historicalArchive?.fixtures : undefined;
   return {
     scoring: modeState().scoring, manualAvailability: roundAvailability(), penaltyTakers: new Set(modeState().penaltyTakers),
+    officialVotes: mode === 'real' ? officialVoteIndex() : undefined,
     fixtureScore(fixture) {
       if (!predictions.has(fixture.id)) predictions.set(fixture.id, matchScoreSampler(predictMatch(fixture, dataset.fixtures, prior)));
       return predictions.get(fixture.id);
@@ -1151,7 +1244,7 @@ const SCORING_LABELS = {
 function scoringPanel() {
   const rules = sanitizeScoring(modeState().scoring);
   return `<details class="panel stacked"><summary>Regolamento Classic</summary>
-    <p class="inline-status">Questi valori si applicano alla simulazione per eventi quando il dato è disponibile. I fantavoti importati usano il proprio regolamento.</p>
+    <p class="inline-status">Questi valori si applicano all’Excel di giornata e alla simulazione per eventi quando il dato è disponibile. I fantavoti già calcolati dalla fonte mantengono il proprio punteggio. Per attivare il bonus porta inviolata, inserisci il valore previsto dalla lega.</p>
     <form id="classic-scoring"><div class="scoring-fields">${Object.entries(SCORING_LABELS).map(([key, label]) =>
       `<label class="field-label">${label}<input type="number" name="${key}" min="-30" max="30" step="0.01" required value="${rules[key]}"></label>`).join('')}</div>
     <div class="form-fields">
@@ -1189,26 +1282,11 @@ function simulatorOutput(result, single = false) {
   ${result.individual.map(row => `<tr><td>${html(row.name)}</td><td>${row.role === 'starter' ? 'Titolare' : 'Panchina'}</td><td>${projectionLabel(row.method)}</td><td class="numeric">${number(row.mean,2)}</td><td class="numeric">${percent(row.usedProbability)}</td></tr>`).join('')}</tbody></table></div></div>`}`;
 }
 function simulazione() {
-  const record = lineup();
-  const starters = groupPlayers(record.starters);
-  const validation = validateLineup(starters, record.formation);
-  const ready = starters.filter(player => Number.isFinite(playerAnalysis(player).expectedPoints)).length;
-  return `${heading('Simulazione', 'Esplora come presenze, bonus e sostituzioni cambiano la distribuzione dei fantapunti.')}
-  <div class="split"><section class="panel"><div class="panel-head"><div><h2>Monte Carlo</h2><p>${html(record.formation)} · ${starters.length}/11 titolari · ${record.reserves.length} riserve</p></div></div>
-    ${!validation.valid ? `<p class="notice neutral">Imposta 11 titolari compatibili con il modulo. <a href="#rosa" class="text-link">Vai alla rosa →</a></p>` : ''}
-    ${mode === 'real' && starters.length ? `<p class="inline-status">${ready} titolari con una stima su ${starters.length}.${ready < starters.length ? ' Lo storico FantaTB può essere integrato con l’Excel della tua lega.' : ''}</p>` : ''}
-    ${mode === 'real' && !marketImports.listone?.asOfRound ? '<p class="inline-status"><a class="text-link" href="#mercato">Carica il listone e indica fino a quale giornata è aggiornato</a> per usare fantamedia e partite a voto della lega.</p>' : ''}
-    <form id="simulation-form"><div class="form-fields">
-      <label class="field-label">Scenari<select name="iterations">${[1000,5000,10000,30000].map(n => `<option value="${n}" ${n === (simulationResult?.iterations || 5000) ? 'selected' : ''}>${number(n)}</option>`).join('')}</select></label>
-      <label class="field-label">Seed<input type="number" name="seed" value="${html(simulationResult?.seed ?? 202627)}" min="0" max="4294967295" required></label></div>
-      <button class="primary" type="submit" ${validation.valid ? '' : 'disabled'}>Avvia simulazione</button>
-    </form>
-    <p class="inline-status">Stesso seed, stessi dati e stessa formazione producono lo stesso risultato. <a class="text-link" href="#fonti">Regole del modello</a></p>
-    ${lineupUndo[mode].has(round) ? '<button type="button" data-lineup-undo>Annulla ultima modifica</button>' : ''}
-    ${mode === 'demo' && dataset.demoPreset ? '<button data-load-preset>Carica rosa demo</button>' : ''}
-  </section><section class="panel" id="simulation-output" aria-live="polite">${lineupSimulationOutput()}</section></div>
-  ${lineupComparisonPanel()}
-  ${scoringPanel()}`;
+  return renderSimulazione({
+    lineup, groupPlayers, validateLineup, playerAnalysis, heading, html, mode, marketImports,
+    simulationResult, number, lineupUndo, round, dataset, lineupSimulationOutput, lineupComparisonPanel,
+    scoringPanel
+  });
 }
 function canArchiveForecast() {
   const games = byRound();
@@ -1226,19 +1304,30 @@ function saveForecast() {
   const entries = new Map(simulationResult.individual.map(row => [row.id,row]));
   const players = ids => groupPlayers(ids).map(({ id, name, position }) => ({ id, name, position, expectedPoints:entries.get(id)?.mean ?? null }));
   const method = simulationResult.method;
-  const source = method === 'league-history' ? votesImport?.source : method === 'fantatb-history' ? 'FantaTB' : null;
-  const forecast = { season:dataset.season, round, asOf:new Date().toISOString(), starters:players(record.starters),
+  const official = method === 'official-history' ? officialVoteIndex() : null;
+  const source = official?.source ?? (method === 'league-history' ? votesImport?.source : method === 'fantatb-history' ? 'FantaTB' : null);
+  const forecast = { season:dataset.season, round, asOf:new Date().toISOString(),
+    starters:players(record.starters).map(player => ({ ...player, teamId:getPlayer(player.id)?.teamId })),
     reserves:players(record.reserves), maxSubstitutions:record.maxSubstitutions, expectedPoints:simulationResult.mean,
-    coverage:simulationResult.coverage, complete:!simulationResult.excluded.length && method !== 'events',
-    method, source, sourceId:method === 'fantatb-history' ? 'fantatb' : null };
+    coverage:simulationResult.coverage, complete:!simulationResult.excluded.length && method !== 'events' && !(official && modeState().scoring?.defenseModifier),
+    method, source, sourceId:official ? officialSourceKey(official) : method === 'fantatb-history' ? 'fantatb' : null };
+  forecast.reserves = forecast.reserves.map(player => ({ ...player, teamId:getPlayer(player.id)?.teamId }));
   modeState().forecasts[round] = forecast;
   save();
   $('#simulation-output').innerHTML = lineupSimulationOutput();
   $('[data-save-forecast]')?.focus({preventScroll:true});
   notify('Previsione della giornata salvata.');
 }
-function realizedVote(player, day, season, local) {
-  if (local) {
+function realizedVote(player, day, season, basis) {
+  if (basis === 'official') {
+    const official = officialVoteIndex();
+    const subject = { ...getPlayer(player.id), ...player };
+    const row = official.record(subject, season, day);
+    const match = dataset.fixtures.find(fixture => fixture.round === day && fixture.status === 'played' &&
+      (fixture.homeId === row?.teamId || fixture.awayId === row?.teamId));
+    return row && match ? { ...row, sourceId:officialSourceKey(official) } : undefined;
+  }
+  if (basis === 'csv') {
     const sample = votesByPlayer.get(player.id);
     const row = sample?.rows.find(item => item.round === day && item.season === season);
     return row && { fantasyRating:row.fantasyRating, source:sample.source };
@@ -1251,44 +1340,15 @@ function realizedVote(player, day, season, local) {
   }
 }
 function rendimento() {
-  const records = Object.values(modeState().forecasts).sort((a,b) => b.round - a.round);
-  return `${heading('Rendimento della rosa', 'Confronta le previsioni salvate prima della giornata con i fantavoti acquisiti.')}
-    ${records.length ? records.map(forecast => {
-      const local = forecast.method === 'league-history' || (forecast.method !== 'fantatb-history' && forecast.starters.some(player =>
-        votesByPlayer.get(player.id)?.rows.some(row => row.round === forecast.round && row.season === forecast.season)));
-      const result = evaluateLineupPerformance(forecast, (player, day, season) => mode === 'real' ? realizedVote(player, day, season, local) : undefined);
-      return `<section class="panel stacked"><h2>Giornata ${forecast.round}</h2>
-        <p>${html(projectionLabel(result.method))} · ${html(date(forecast.asOf))} · copertura previsione ${percent(result.expectedCoverage)}.</p>
-        <div class="detail-grid">${stat('Fantapunti attesi',number(result.expectedPoints,2))}${stat('Fantapunti reali',number(result.actualPoints,2))}
-        ${stat('Scarto reale − attesi',number(result.difference,2))}${stat('Posti verificati',`${result.coverage.known}/${result.coverage.total}`)}</div>
-        <p class="muted">${result.source ? `Fonte voti · ${html(result.source)}. ` : ''}${html(result.reason)}</p>
-        <details><summary>Rendimento dei calciatori</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Rendimento individuale G${forecast.round}">
-        <table><thead><tr><th>Calciatore</th><th>Attesi accreditati</th><th>Fantavoto</th><th>Punti accreditati</th></tr></thead><tbody>
-        ${result.rows.map(row => `<tr><th scope="row">${html(row.name)}<br><small>${row.kind === 'starter' ? 'Titolare' : 'Riserva'}</small></th>
-          <td>${number(row.expectedPoints,2)}</td><td>${row.recorded && row.fantasyRating === null ? 'SV' : number(row.fantasyRating,2)}</td><td>${number(row.creditedPoints,2)}</td></tr>`).join('')}
-        </tbody></table></div></details></section>`;
-    }).join('') : '<section class="panel"><p>Salva una previsione in Simulazione prima che cominci la giornata.</p><a class="btn" href="#simulazione">Apri simulazione</a></section>'}`;
+  return renderRendimento({
+    modeState, heading, votesByPlayer, officialArchive, evaluateLineupPerformance, mode, realizedVote,
+    html, projectionLabel, date, percent, stat, number
+  });
 }
 function fonti() {
-  const sources = dataset.sources.map(source => {
-    const href = safeUrl(source.url);
-    return `<li>${href ? `<a href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(source.name)}</a>` : html(source.name)}
-      ${source.license ? ` · ${html(source.license)}` : ''}${source.updatedAt ? ` · aggiornato ${html(date(source.updatedAt))}` : ''}
-      ${source.latestResultDate ? ` · ultimo risultato ${html(date(source.latestResultDate))}` : ''}
-      ${source.note || source.modifications ? `<br>${html(source.note ?? source.modifications)}` : ''}</li>`;
+  return renderFonti({
+    dataset, safeUrl, html, date, heading, mode, coverageRows
   });
-  return `${heading('Fonti e metodo', 'Controlla la provenienza, la copertura e le ipotesi delle stime.')}
-  <div class="split"><section class="panel prose"><h2>Provenienza dei dati</h2>
-    <p>${dataset.updatedAt ? `Snapshot elaborato il ${html(date(dataset.updatedAt))}.` : 'Data di elaborazione mancante.'} Il trattino indica un dato mancante. Un valore pari a zero viene mostrato come 0.</p>
-    ${sources.length ? `<ul>${sources.join('')}</ul>` : ''}
-    ${mode === 'real' ? `<h3>Copertura della stagione</h3><p>Lo snapshot può essere parziale. Una partita con data trascorsa e risultato assente viene mostrata come «Risultato mancante». L’assenza di segnalazioni non conferma la disponibilità.</p>` : '<p>Le statistiche demo sono sintetiche e servono per provare tutte le funzioni.</p>'}
-    ${coverageRows()}
-  </section><section class="panel prose"><h2>Metodo di calcolo</h2>
-    <h3>Indice di schierabilità</h3><p>Scala 0–100. Probabilità di giocare 40%, minuti 25%, bonus 25% e avversario 10%. Il peso dei dati disponibili viene riproporzionato e la copertura è mostrata in scheda. Le partite concluse non ricevono una previsione retroattiva.</p>
-    <h3>Match Center</h3><p>Il modello Poisson usa risultati precedenti alla partita, medie di campionato in casa e in trasferta e rendimento delle squadre sul rispettivo campo. Quando disponibile incorpora lo storico 2025/26. Il test retrospettivo è in Analisi.</p>
-    <h3>Monte Carlo</h3><p>La stima può campionare i fantavoti CSV della lega o FantaTB. Può anche usare la fantamedia Excel oppure simulare minuti, gol, assist e malus dai dati di gioco. Le sostituzioni seguono l’ordine della panchina e il ruolo.</p>
-    <h3>xG e xA</h3><p>xG stima la qualità dei tiri. xA stima la qualità delle occasioni create. I valori per 90 minuti si calcolano con minuti positivi e metriche acquisite.</p>
-  </section></div>`;
 }
 
 function readMarketSource(kind) {
@@ -1528,33 +1588,10 @@ function marketResults(market) {
     ${marketList(candidates,comparisons,false)}`;
 }
 function mercato() {
-  if (mode === 'demo') return `${heading('Mercato', 'Analizza gli svincolati e gli scambi della tua lega.')}
-    <section class="panel"><p>Gli Excel della lega si caricano in modalità Dati reali.</p><button data-mode="real">Passa ai dati reali</button></section>`;
-  const market = getMarket();
-  const coverage = market.coverage;
-  return `${heading('Mercato', 'Cerca possibili miglioramenti tra gli svincolati e confronta gli scambi per ruolo.')}
-    <div class="market-inputs">${Object.keys(MARKET_UPLOADS).map(marketImportCard).join('')}</div>
-    <p class="inline-status">Gli Excel e le assegnazioni restano su questo browser. Il listone della lega è disponibile in questa sezione.</p>
-    ${coverage.catalog ? `<div class="market-facts market-coverage" aria-label="Copertura analisi">
-      ${coverage.roster ? `<span>Rosa collegata ${number(coverage.matchedRoster)}/${number(coverage.roster)}</span>` : ''}
-      ${marketImports.svincolati ? `<span>${number(coverage.eligibleFreeAgents)} svincolati candidabili</span><span>${number(coverage.unscoredFreeAgents)} senza indice</span>` : ''}
-      ${coverage.conflictingFreeAgents ? `<span>${number(coverage.conflictingFreeAgents)} righe discordanti escluse</span>` : ''}
-    </div>` : ''}
-    ${marketNotice ? `<p class="notice neutral" role="status">${html(marketNotice)}</p>` : ''}
-    <section class="panel market-workbench">
-      <div class="panel-head"><div><h2>${MARKET_TABS[marketFilters.tab]}</h2><p>${marketFilters.tab === 'riparazione'
-        ? 'Il filtro usa la quotazione di riferimento. Il prezzo effettivo dipende dalla tua asta.'
-        : marketFilters.tab === 'scambi' ? 'Un confronto alla volta tra giocatori dello stesso ruolo. Conguaglio positivo se paghi, negativo se incassi.'
-        : 'Cerca tra tutti i giocatori dell’Excel, compresi quelli fuori lista.'}</p></div></div>
-      <div class="mode-switch market-tabs" role="group" aria-label="Sezione mercato">${Object.entries(MARKET_TABS).map(([id,label]) =>
-        `<button type="button" data-market-tab="${id}" aria-pressed="${id === marketFilters.tab}">${label}</button>`).join('')}</div>
-      ${marketToolbar(market)}
-      <div id="market-results">${marketResults(market)}</div>
-      <details class="market-method"><summary>Fonti e metodo dell’indice</summary>
-        <p>Il confronto usa fantamedia e partite a voto dell’Excel. La fantamedia corretta si avvicina al valore tipico del ruolo quando il campione è piccolo. Quotazioni e FVM sono riferimenti del file. Il trattino indica un dato mancante.</p>
-        ${market.notes.length ? `<ul>${market.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
-      </details>
-    </section>`;
+  return renderMercato({
+    mode, heading, getMarket, MARKET_UPLOADS, marketImportCard, number, marketImports, marketNotice, html,
+    MARKET_TABS, marketFilters, marketToolbar, marketResults
+  });
 }
 function refreshMarket() {
   const results = $('#market-results');
@@ -1638,60 +1675,18 @@ function seasonTable(now, then) {
         ${[0,1,2,3,4].map(index => `<td class="numeric">${index === 4 ? percent(cells[index]) : number(cells[index],index ? 2 : 0)}</td>`).join('')}</tr>`;
     }).join('')).join('')}</tbody></table></div>`;
 }
-function analisi() {
-  const description = 'Confronta le prestazioni delle squadre con la stagione precedente e verifica la copertura dei dati individuali.';
-  if (mode === 'demo') return `${heading('Analisi',description)}<section class="panel">
-    <p>L’archivio delle stagioni di Serie A è disponibile in Dati reali.</p><button data-mode="real">Passa ai dati reali</button></section>`;
-  const options = [...new Map([...dataset.teams,...(historicalArchive?.teams ?? [])].map(team => [team.id,team])).values()]
-    .sort((a,b) => a.shortName.localeCompare(b.shortName,'it'));
-  const team = options.find(item => item.id === analysisTeamId) ?? options[0];
-  if (!team) return `${heading('Analisi',description)}${empty('Squadre non disponibili.')}`;
-  const currentTeam = getTeam(team.id);
-  const current = currentTeam ? teamSeasonRows(team.id,dataset.fixtures) : null;
-  const historic = historicalArchive?.teamMap.has(team.id) ? teamSeasonRows(team.id,historicalArchive.fixtures,true) : null;
-  const xg = currentTeam?.stats?.xg;
-  const xgMatches = currentTeam?.stats?.xgMatches;
-  const goals = current?.totals.scored;
-  const totalMatches = current?.totals.games;
-  const coveredFixtures = dataset.fixtures.filter(row => row.status === 'played').length;
-  const playersWithVotes = dataset.players.filter(p => p.ratings?.some(r => Number.isFinite(r.fantasyRating))).length;
-  const sample = Number.isFinite(xg) && Number.isFinite(xgMatches);
+function matchValidation() {
   if (historicalArchive && matchBacktest?.dataset !== dataset) {
     matchBacktest = { dataset, report: backtestMatches(dataset.fixtures, historicalArchive.fixtures) };
   }
-  const validation = matchBacktest?.report;
-  return `${heading('Analisi',description)}
-    <div class="metrics" aria-label="Copertura dell’analisi">
-      ${metric('Risultati 2026/27',number(coveredFixtures),'Partite concluse acquisite','pitch')}
-      ${metric('Risultati 2025/26',number(historicalArchive?.fixtures.length),'Archivio storico di Serie A','calendar')}
-      ${metric('Giocatori con fantavoti',number(playersWithVotes),'Serie 2026/27 FantaTB','users')}
-    </div>
-    <div class="split">
-      <section class="panel"><div class="panel-head"><div><h2>Analisi squadre</h2><p>Confronto per partita e per campo</p></div>
-        <label class="field-label">Squadra<select id="analysis-team">${options.map(item =>
-          `<option value="${html(item.id)}" ${item.id === team.id ? 'selected' : ''}>${html(item.shortName)}</option>`).join('')}</select></label></div>
-        ${historicalError ? '<p class="notice neutral">L’archivio della stagione precedente non è raggiungibile.</p>' : !historicalArchive ? '<p class="muted">Caricamento dello storico…</p>' : ''}
-        ${seasonTable(current,historic)}
-        ${sample ? `<div class="duel"><h3>Produzione offensiva attesa · 2026/27</h3><p>${number(xg,2)} xG misurati in ${number(xgMatches)} partite · ${number(byGame(xg,xgMatches),2)} xG/partita. ${sourceLink(currentTeam.stats.xgSource)}</p>
-        ${Number.isFinite(goals) && totalMatches > 0 ? `<p>Gol fatti nell’archivio dei risultati · ${number(goals)} su ${number(totalMatches)} partite. La differenza gol − xG richiede campioni verificati partita per partita.</p>` : ''}</div>` : ''}
-      </section>
-      <section class="panel prose"><h2>Analisi calciatori</h2>
-        <p>Le schede mostrano il rendimento osservato e la fonte del fantapunteggio atteso.</p>
-        <div class="actions"><a class="btn primary" href="#giocatori">Apri le schede</a><a class="btn" href="#simulazione">Simula la formazione</a></div>
-        <h3>Metodo e fonti</h3><p>Usa le medie su campioni confrontabili e verifica la provenienza di xG, assist attesi e fantavoti.</p>
-        <a class="text-link" href="#fonti">Copertura e fonti →</a>
-        <p><a href="https://github.com/cramberri1/fantalab-pro-2026-27/blob/main/docs/ANALISI.md" target="_blank" rel="noopener noreferrer">Scheda delle fonti per player e match analysis</a></p>
-      </section>
-    </div>
-    <div class="split overview-rounds">${votesPanel()}
-      <section class="panel"><h2>Verifica retrospettiva 1X2</h2>
-        ${validation?.matches ? `<p>${number(validation.matches)} partite 2026/27. Per ogni partita il modello usa soltanto risultati dei giorni precedenti. Il riferimento usa le medie casa e trasferta di Serie A.</p>
-        <div class="table-wrap"><table><thead><tr><th>Metodo</th><th>Brier</th><th>Log loss</th></tr></thead><tbody>
-        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes]].map(([label, scores]) =>
-          `<tr><th scope="row">${label}</th><td>${number(scores?.brier,4)}</td><td>${number(scores?.logLoss,4)}</td></tr>`).join('')}</tbody></table></div>
-        <p>Modello scelto · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. Correzione valutata su ${number(validation.dixonColesMatches)} gare. Valori più bassi indicano previsioni migliori sul campione.</p>`
-        : '<p>Verifica disponibile con l’archivio della stagione precedente e risultati acquisiti.</p>'}</section>
-    </div>`;
+  return matchBacktest?.report;
+}
+function analisi() {
+  return renderAnalisi({
+    mode, heading, dataset, historicalArchive, analysisTeamId, empty, getTeam, teamSeasonRows,
+    matchValidation, metric, number, html, historicalError, seasonTable, sourceLink, byGame,
+    officialVotesPanel, votesPanel
+  });
 }
 
 function refreshPlayers() {
@@ -1709,6 +1704,19 @@ function setPage(next) {
   $('#workspace').focus({ preventScroll: true });
 }
 function wireEvents() {
+  pageView.addEventListener('dragover', event => {
+    const drop = event.target.closest('#official-votes-drop');
+    if (!drop || !event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    drop.classList.add('is-over');
+  });
+  pageView.addEventListener('dragleave', event => event.target.closest('#official-votes-drop')?.classList.remove('is-over'));
+  pageView.addEventListener('drop', event => {
+    if (!event.target.closest('#official-votes-drop')) return;
+    event.preventDefault();
+    event.target.closest('#official-votes-drop').classList.remove('is-over');
+    if (mode === 'real') void importOfficialFiles([...event.dataTransfer.files]);
+  });
   wireLineupDrag(pageView, {
     getFeedback(id, target) {
       return page === 'rosa' && Boolean(placeLineupPlayer(lineup(), lineupRoster(), id, target).starters);
@@ -1798,6 +1806,14 @@ function wireEvents() {
     if ('votesTemplate' in data) {
       download('Stagione;Giornata;ID FantaLab;Nome;Squadra;Ruolo;Fantavoto;Voto\r\n', 'fantalab-fantavoti.csv', 'text/csv;charset=utf-8');
     }
+    if (page === 'analisi' && mode === 'real') {
+      if (data.officialRemove) void updateOfficialSettings({ remove:data.officialRemove });
+      if ('officialRelink' in data) void updateOfficialSettings({ relink:true });
+      if ('officialCancel' in data) {
+        officialPending = undefined;
+        refreshOfficialPanel();
+      }
+    }
     if ('votesClear' in data) {
       votesImportVersion++;
       const saved = setVotesImport(null);
@@ -1871,7 +1887,15 @@ function wireEvents() {
     if ('clearComparison' in data) { selectedComparison[mode] = []; refreshPlayers(); $('#player-search').focus(); }
     if ('loadPreset' in data) preset();
     if ('closeDialog' in data) dialog.close();
-    if ('export' in data) download(JSON.stringify({schemaVersion:1,season:'2026/27',state:storage},null,2), 'fantalab-pro-backup.json','application/json');
+    if ('export' in data) {
+      if (mode === 'real' && (!officialLoaded || officialBusy)) {
+        notify('Attendi il caricamento dell’archivio voti prima di esportare.');
+        return;
+      }
+      const backup = { schemaVersion:1, season:'2026/27', state:storage };
+      if (officialArchive.days.length) backup.officialVotes = { edition:officialArchive.edition, days:officialArchive.days };
+      download(JSON.stringify(backup), 'fantalab-pro-backup-personale.json','application/json');
+    }
     if ('csvTemplate' in data) download('\uFEFFid;nome;squadra\r\n','fantalab-pro-rosa.csv','text/csv;charset=utf-8');
   });
   document.addEventListener('input', event => {
@@ -1885,6 +1909,14 @@ function wireEvents() {
   document.addEventListener('change', async event => {
     if (!dataset) return;
     const { id, value } = event.target;
+    if (mode === 'real' && id === 'official-votes-files') {
+      await importOfficialFiles([...event.target.files]);
+      return;
+    }
+    if (mode === 'real' && id === 'official-votes-edition') {
+      await updateOfficialSettings({ edition:value });
+      return;
+    }
     if (event.target.dataset.penaltyTaker) {
       const playerId = event.target.dataset.penaltyTaker;
       const takers = new Set(modeState().penaltyTakers);
@@ -1955,15 +1987,22 @@ function wireEvents() {
       if (!file) return;
       const activeMode = mode;
       try {
-        if (file.size > 2_000_000) throw new Error('Il file supera 2 MB.');
+        const maxBytes = id === 'backup-json' ? 32_000_000 : 2_000_000;
+        if (file.size > maxBytes) throw new Error(`Il file supera ${maxBytes / 1_000_000} MB.`);
         const text = id === 'roster-csv' ? decodeRosterCsv(await file.arrayBuffer()) : await file.text();
         if (activeMode !== mode) return;
-        importReport = id === 'roster-csv' ? importCsv(text) : { message: restoreBackup(text) };
+        importReport = id === 'roster-csv' ? importCsv(text) : { message: await restoreBackup(text) };
       } catch (error) { importReport = { message: error instanceof SyntaxError ? 'Backup JSON non valido.' : error.message }; }
       render();
     }
   });
   document.addEventListener('submit', event => {
+    if (event.target.id === 'official-votes-confirm') {
+      event.preventDefault();
+      const season = new FormData(event.target).get('season');
+      if (mode === 'real' && officialPending && ['2026/27','2025/26'].includes(season)) void importOfficialFiles(officialPending, season);
+      return;
+    }
     if (event.target.id === 'classic-scoring') {
       event.preventDefault();
       const data = new FormData(event.target);
@@ -2014,6 +2053,7 @@ function wireEvents() {
 }
 wireEvents();
 void switchMode('real');
+void openOfficialArchive();
 if (document.querySelector('meta[name="fantalab-offline"]')?.content === 'enabled' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }

@@ -33,26 +33,29 @@ async function inlineStyles(css) {
 }
 
 function inlineModules(app, modules) {
-  let entry = app;
+  const bound = new Map();
+  const resolveImports = (source, importer) => source.replace(/^import\s+\{\s*([\w$,\s]+)\s*\}\s+from\s+['"]\.\/([\w.-]+)['"];\s*/gm,
+    (_, imports, path) => {
+      const dependency = bound.get(path);
+      const names = imports.split(',').map(name => name.trim()).filter(Boolean);
+      if (!dependency || names.some(name => !dependency.names.has(name))) {
+        throw new Error('Import non incorporabile in ' + importer + ' da ' + path + '.');
+      }
+      return 'const { ' + names.join(', ') + ' } = ' + dependency.namespace + ';\n\n';
+    });
   const declarations = modules.map(({ path, namespace, source }) => {
     const names = [];
-    const body = source.replace(/^export (const|function) ([A-Za-z_$][\w$]*)/gm, (_, type, name) => {
+    const body = resolveImports(source, path).replace(/^export (const|(?:async )?function) ([A-Za-z_$][\w$]*)/gm, (_, type, name) => {
       names.push(name);
       return `${type} ${name}`;
     });
-    const dependency = path.replaceAll('.', '\\.');
-    const importPattern = new RegExp(`^import \\{\\s*([\\w$,\\s]+)\\s*\\} from ['"]\\.\\/${dependency}['"];\\s*`, 'm');
-    entry = replaceRequired(entry, importPattern, (_, bindings) => {
-      if (bindings.split(',').map(binding => binding.trim()).filter(Boolean).some(name => !names.includes(name))) {
-        throw new Error(`L’app importa un simbolo assente da ${path}.`);
-      }
-      return `const { ${bindings.trim()} } = ${namespace};\n\n`;
-    });
+    bound.set(path, { namespace, names: new Set(names) });
     if (/^\s*(import|export)\s/m.test(body)) {
       throw new Error(`Il bundler supporta soltanto gli export nominali in ${path}.`);
     }
     return `const ${namespace} = (() => {\n${body}\nreturn { ${names.join(', ')} };\n})();`;
   });
+  const entry = resolveImports(app, 'app.js');
   if (/^\s*(import|export)\s/m.test(entry)) {
     throw new Error('L’app contiene un import o export non incorporato.');
   }
@@ -76,19 +79,35 @@ function replaceRequired(value, pattern, replacement) {
 }
 
 const [html, css, icon, model, rosterImport, marketImport, market, calendar, matchModel, lineupDrag, lineupContext, lineupComparison,
-  manualAvailability, fixtureDifficulty, lineupSuggestion, lineupPerformance, app, real, demo, history] = await Promise.all([
+  manualAvailability, fixtureDifficulty, lineupSuggestion, lineupPerformance, officialVotes, officialVoteModel, officialVoteStorage, app, real, demo, history] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
   read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/match-model.js'),
   read('js/lineup-drag.js'), read('js/lineup-context.js'), read('js/lineup-comparison.js'), read('js/manual-availability.js'),
-  read('js/fixture-difficulty.js'), read('js/lineup-suggestion.js'), read('js/lineup-performance.js'), read('js/app.js'),
+  read('js/fixture-difficulty.js'), read('js/lineup-suggestion.js'), read('js/lineup-performance.js'), read('js/official-votes.js'),
+  read('js/official-vote-model.js'), read('js/official-vote-storage.js'), read('js/app.js'),
   read('data/serie-a-2026-27.json'), read('data/demo.json'),
   read('data/serie-a-2025-26.json').catch(error => { if (error.code === 'ENOENT') return null; throw error; })
 ]);
 const styles = await inlineStyles(css);
+const views = await Promise.all([
+  ['view-panoramica.js', 'FantaLabViewPanoramica'],
+  ['view-match.js', 'FantaLabViewMatch'],
+  ['view-giocatori.js', 'FantaLabViewGiocatori'],
+  ['view-analisi.js', 'FantaLabViewAnalisi'],
+  ['view-rosa.js', 'FantaLabViewRosa'],
+  ['view-mercato.js', 'FantaLabViewMercato'],
+  ['view-simulazione.js', 'FantaLabViewSimulazione'],
+  ['view-rendimento.js', 'FantaLabViewRendimento'],
+  ['view-fonti.js', 'FantaLabViewFonti']
+].map(async ([path, namespace]) => ({ path, namespace, source: await read(`js/${path}`) })));
 const modules = [
+  ...views,
+  { path: 'official-vote-model.js', namespace: 'FantaLabOfficialVoteModel', source: officialVoteModel },
   { path: 'model.js', namespace: 'FantaLabModel', source: model },
   { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport },
   { path: 'market-import.js', namespace: 'FantaLabMarketImport', source: marketImport },
+  { path: 'official-votes.js', namespace: 'FantaLabOfficialVotes', source: officialVotes },
+  { path: 'official-vote-storage.js', namespace: 'FantaLabOfficialVoteStorage', source: officialVoteStorage },
   { path: 'market.js', namespace: 'FantaLabMarket', source: market },
   { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar },
   { path: 'lineup-drag.js', namespace: 'FantaLabLineupDrag', source: lineupDrag },
@@ -98,9 +117,7 @@ const modules = [
   { path: 'fixture-difficulty.js', namespace: 'FantaLabFixtureDifficulty', source: fixtureDifficulty },
   { path: 'lineup-suggestion.js', namespace: 'FantaLabLineupSuggestion', source: lineupSuggestion },
   { path: 'lineup-performance.js', namespace: 'FantaLabLineupPerformance', source: lineupPerformance },
-  { path: 'match-model.js', namespace: 'FantaLabMatchModel',
-    source: replaceRequired(matchModel, /^import \{ fixtureCalendarDay \} from '\.\/calendar\.js';/m,
-      'const { fixtureCalendarDay } = FantaLabCalendar;') }
+  { path: 'match-model.js', namespace: 'FantaLabMatchModel', source: matchModel }
 ];
 const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'),
   ...(history ? [inlineData(history, 'real', '2025/26', 'history')] : []),

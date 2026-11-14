@@ -1,3 +1,5 @@
+import { drawOfficialFantasy } from './official-vote-model.js';
+
 const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
 const POSITION_LABELS = { GK: 'portieri', DEF: 'difensori', MID: 'centrocampisti', FWD: 'attaccanti' };
 export const FORMATION_OPTIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'];
@@ -22,7 +24,7 @@ const PENDING = new Set(['scheduled', 'timed', 'upcoming', 'tbd', 'ns', 'not sta
 const RULED_OUT = new Set(['out', 'injured', 'suspended', 'unavailable', 'ruled_out', 'ruled out']);
 const QUESTIONABLE = new Set(['doubtful', 'questionable', 'doubt', 'probable', 'uncertain']);
 const CONFIRMED = new Set(['available', 'fit', 'cleared']);
-const METHODS = ['league-history', 'league-average', 'fantatb-history', 'events'];
+const METHODS = ['official-history', 'league-history', 'league-average', 'fantatb-history', 'events'];
 const FANTASY_SOURCE = 'transferbeat-ratings';
 const MIN_HISTORICAL_OBSERVATIONS = 3;
 const MIN_HISTORICAL_VOTES = 2;
@@ -392,18 +394,24 @@ function localFantasy(record, dataset, fixture, sample, asOf) {
 
 function empiricalAnalysis(record, result, dataset, options) {
   if (result.mode !== 'real' || !result.fixture || !Number.isFinite(fixtureTime(result.fixture))) return null;
+  const official = !options.method || options.method === 'official-history' ? options.officialVotes?.project(record, {
+    season:dataset.season, fixture:result.fixture, fixtures:dataset.fixtures, asOf:options.asOfTime
+  }) : null;
   const local = !options.method || options.method === 'league-history'
     ? localFantasy(record, dataset, result.fixture, options.leagueVotes, options.asOfTime) : null;
   const fromHistory = !local && (!options.method || options.method === 'fantatb-history')
     ? historicalFantasy(record, dataset, result.fixture, options.asOfTime) : null;
   const fromLeague = !local && (!options.method || options.method === 'league-average')
     ? leagueFantasy(record, dataset, result.fixture, options.fantasySample, options.asOfTime) : null;
-  const empirical = local ?? (fromLeague && (!fromHistory || fromLeague.sample.asOfRound > fromHistory.sample.asOfRound) ? fromLeague : fromHistory);
+  const empirical = official ?? local ?? (fromLeague && (!fromHistory || fromLeague.sample.asOfRound > fromHistory.sample.asOfRound) ? fromLeague : fromHistory);
   if (!empirical) return null;
   const { sample, method } = empirical;
   const voteProbability = empirical.voteProbability * result.availability.multiplier;
   const projection = { ...empirical, voteProbability, appearanceProbability: null, startProbability: null, expectedMinutes: null };
-  const notes = method === 'league-history'
+  const notes = method === 'official-history'
+    ? [`${sample.source} · ${sample.votes} voti su ${sample.observations} giornate osservate. La probabilità di voto approssima l’impiego.`,
+       `Deviazione del voto ${sample.ratingSd.toFixed(2)} · ${sample.sdFallback ? 'valore di riserva' : `${sample.ratingCount} voti del ruolo`}. Eventi regolarizzati con cinque osservazioni equivalenti di ruolo.`]
+    : method === 'league-history'
     ? [`Fantavoti CSV · ${sample.source} · giornate ${sample.rounds.join(', ')}. ${sample.votes} voti su ${sample.observations} righe esplicite. Le righe mancanti sono escluse.`]
     : method === 'league-average'
     ? [`Dati dell’Excel di lega fino alla giornata ${sample.asOfRound}. ${sample.votes} voti su ${sample.observations} partite della squadra. Ogni voto simulato usa la fantamedia del file. La variabilità del singolo voto non è disponibile.`]
@@ -411,14 +419,14 @@ function empiricalAnalysis(record, result, dataset, options) {
   if (result.availability.status === 'unknown') notes.push('Disponibilità per la giornata non verificata.');
   if (result.availability.status === 'reported') notes.push(`Segnalazione senza esito confermato. ${result.availability.reason}.`);
   if (result.availability.status === 'doubtful') notes.push('Giocatore in dubbio. La probabilità di ricevere voto è ridotta del 25%.');
-  const indexFromVotes = method === 'league-average' ? leagueVoteIndex(voteProbability, sample.averageRating) : {};
+  const indexFromVotes = ['league-average','official-history'].includes(method) ? leagueVoteIndex(voteProbability, sample.averageRating, method) : {};
   return { ...result, ...indexFromVotes, projection, expectedPoints: voteProbability * average(empirical.scores), notes, status: 'estimated' };
 }
 
-function leagueVoteIndex(voteProbability, averageRating) {
+function leagueVoteIndex(voteProbability, averageRating, method) {
   const components = [
     { id: 'vote', label: 'Probabilità di voto', value: 100 * voteProbability, weight: 65,
-      detail: 'Partite a voto sulle gare della squadra nel campione Excel, con eventuale correzione per disponibilità.' }
+      detail: 'Partite a voto sulle gare della squadra nel campione, con eventuale correzione per disponibilità.' }
   ];
   if (finite(averageRating)) components.push({
     id: 'average-rating', label: 'Media voto', value: clamp((averageRating - 4) / 4 * 100, 0, 100), weight: 35,
@@ -430,12 +438,12 @@ function leagueVoteIndex(voteProbability, averageRating) {
     component.contribution = component.value * component.weight / weight;
   }
   return { index: Math.round(sum(components.map(component => component.contribution))), components,
-    coverage: weight / 100, indexMethod: 'league-average' };
+    coverage: weight / 100, indexMethod: method };
 }
 
 export function analyzePlayer(player, options = {}) {
   const { dataset, round, mode = dataset?.mode } = options;
-  const localPlayer = mode === 'real' && (options.fantasySample || options.leagueVotes || options.manualAvailability) && typeof player?.id === 'string'
+  const localPlayer = mode === 'real' && (options.fantasySample || options.leagueVotes || options.officialVotes || options.manualAvailability) && typeof player?.id === 'string'
     && player.id.startsWith('csv:') && POSITIONS.includes(player.position)
     && (dataset?.teams ?? []).some((team) => sameId(team.id, player.teamId));
   const record = dataset?.players?.find((item) => sameId(item.id, player?.id)) ?? (localPlayer ? player : null);
@@ -586,6 +594,7 @@ function drawAppearance(projection, rng) {
   const draw = rng();
   if (projection.voteProbability != null) {
     if (draw >= projection.voteProbability) return null;
+    if (projection.official) return drawOfficialFantasy(projection, rng);
     return { points: projection.scores[Math.floor(rng() * projection.scores.length)], vote: null };
   }
   let cumulative = 0;
@@ -695,7 +704,7 @@ function makeHistogram(values) {
 
 export function simulateLineup(starters, options = {}) {
   const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples,
-    leagueVotesByPlayer, manualAvailability, penaltyTakers, fixtureScore, asOf = Date.now() } = options;
+    leagueVotesByPlayer, manualAvailability, penaltyTakers, fixtureScore, officialVotes, asOf = Date.now() } = options;
   const scoring = sanitizeScoring(options.scoring);
   const iterations = clamp(Math.trunc(Number(options.iterations) || 5000), 1, 30000);
   const maxSubstitutions = clamp(Math.trunc(Number(options.maxSubstitutions ?? 3) || 0), 0, 11);
@@ -719,7 +728,7 @@ export function simulateLineup(starters, options = {}) {
       : fantasySamples && Object.hasOwn(fantasySamples, record.id) ? fantasySamples[record.id] : null;
     const analyze = (method) => {
       const result = analyzePlayer(record, { dataset, round, mode, fantasySample, leagueVotes: leagueVotesByPlayer?.get(record.id),
-        manualAvailability: manualAvailability?.get(record.id), penaltyTaker: penaltyTakers?.has(record.id), scoring, asOf, method });
+        manualAvailability: manualAvailability?.get(record.id), penaltyTaker: penaltyTakers?.has(record.id), scoring, officialVotes, asOf, method });
       if (round != null && round !== '' && !result.fixture && result.notes[0] !== 'Giocatore assente dall’archivio selezionato.') {
         return { ...result, expectedPoints: null, notes: ['La squadra non ha una partita verificata per la giornata selezionata.'] };
       }
@@ -836,6 +845,9 @@ export function simulateLineup(starters, options = {}) {
     matchGroups.length ? `Punteggi condivisi per ${matchGroups.length} partite su ${grouped.size}. Gol e assist vengono assegnati fra i giocatori in campo e il resto della squadra.`
       : 'Gol, assist e gol subiti stimati con eventi indipendenti per giocatore.',
     'Il voto base oscilla intorno a 6. La deviazione standard proviene dai voti FantaTB già pubblicati per ruolo oppure dalla riserva di 0,45–0,50.',
+  ] : method === 'official-history' ? [
+    `Base di punteggio · ${officialVotes.source}. Frequenze da partite a voto, con deviazione del ruolo ed eventi regolarizzati verso il ruolo.`,
+    'I voti con asterisco restano nel campione di rendimento e vengono esclusi dalla stima della deviazione standard.',
   ] : method === 'league-history' ? [
     `La simulazione estrae un fantavoto dal CSV della lega${localSource ? ` (${localSource})` : ''}. Le righe esplicite senza voto contribuiscono alla probabilità di sostituzione.`,
   ] : method === 'league-average' ? [
@@ -864,7 +876,7 @@ export function simulateLineup(starters, options = {}) {
       (!matchGroups.some(group => group.entries.includes(entry)) || entry.analysis.projection.extraRates.penaltyScored == null))) {
       notes.push('La segnalazione rigorista pesa solo con un tasso di rigori acquisito e un punteggio di squadra disponibile.');
     }
-  } else if (options.scoring) notes.push('I fantavoti e le fantamedie importati incorporano già bonus e malus della fonte. Il regolamento della simulazione per eventi non viene applicato.');
+  } else if (method !== 'official-history' && options.scoring) notes.push('I fantavoti e le fantamedie importati incorporano già bonus e malus della fonte. Il regolamento della simulazione per eventi non viene applicato.');
   notes.push(`Sostituzioni nell’ordine della panchina e a parità di ruolo. Limite di ${maxSubstitutions} per simulazione.`);
   if (excluded.length) notes.push('I giocatori con dati insufficienti sono esclusi. Le riserve subentrano solo per le assenze simulate dei titolari con dati sufficienti.');
   return {

@@ -208,6 +208,10 @@ tr:last-child td { border-bottom: 0; }
 .lineup-controls, .form-fields { display: flex; flex-wrap: wrap; gap: 9px; align-items: end; margin: 0 0 12px; }
 .lineup-controls select { min-width: 95px; }
 .lineup-manual { color: var(--amber); }
+.official-drop { border:1px dashed var(--muted); border-radius:9px; padding:14px; color:var(--muted); }
+.official-drop.is-over { border-color:var(--lime); background:#20301f; color:var(--text); }
+.official-votes .form-fields { margin-top:10px; }
+.official-day h3, .official-player-history h4 { margin-block:6px; }
 .forecast-actions { margin-top: 12px; }
 .scoring-fields { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%,125px), 1fr)); gap:10px; margin-bottom:14px; }
 .scoring-fields input { width:100%; }

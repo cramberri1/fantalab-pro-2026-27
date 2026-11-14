@@ -252,7 +252,7 @@ function sheetRows(worksheet, shared) {
   });
 }
 
-export const readMarketWorkbook = async (buffer) => {
+async function* workbookSheets(buffer, filter = () => true) {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (bytes.length < 22) throw new Error('Il file non è un archivio XLSX valido.');
   if (bytes.length > MAX_WORKBOOK) throw new Error('Il file Excel supera i 12 MB.');
@@ -268,12 +268,26 @@ export const readMarketWorkbook = async (buffer) => {
   const worksheets = child(workbook, 'sheets');
   for (const sheet of Array.from(worksheets?.children ?? []).slice(0, 12)) {
     if (sheet.localName !== 'sheet' || ['hidden', 'veryHidden'].includes(sheet.getAttribute('state'))) continue;
+    const name = sheet.getAttribute('name') ?? '';
+    if (!filter(name)) continue;
     const id = Array.from(sheet.attributes).find(attribute => attribute.localName === 'id' && attribute.namespaceURI)?.value;
     const relation = relations.find(node => node.getAttribute('Id') === id && node.getAttribute('Type')?.endsWith('/worksheet'));
     const path = relationshipPath(relation?.getAttribute('Target'));
     if (!path) continue;
-    const parsed = parseMarketRows(sheetRows(await read(path, 'worksheet'), shared));
-    if (parsed) return { ...parsed, sheet: sheet.getAttribute('name') ?? '' };
+    yield { name, rows: sheetRows(await read(path, 'worksheet'), shared) };
+  }
+}
+
+export const readWorkbookSheets = async (buffer, filter) => {
+  const sheets = [];
+  for await (const sheet of workbookSheets(buffer, filter)) sheets.push(sheet);
+  return sheets;
+};
+
+export const readMarketWorkbook = async (buffer) => {
+  for await (const { name, rows } of workbookSheets(buffer)) {
+    const parsed = parseMarketRows(rows);
+    if (parsed) return { ...parsed, sheet: name };
   }
   throw new Error('Non ho trovato il foglio Classic di Fantacalcio.it. Usa il file XLSX «Lista calciatori» o «Svincolati».');
 };

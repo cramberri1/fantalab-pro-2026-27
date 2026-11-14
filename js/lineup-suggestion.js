@@ -1,4 +1,4 @@
-const DEFAULT_METHODS = ['league-history', 'league-average', 'fantatb-history', 'events'];
+const DEFAULT_METHODS = ['official-history', 'league-history', 'league-average', 'fantatb-history', 'events'];
 
 function rankByPoints(first, second) {
   return second.points - first.points || String(first.player.id).localeCompare(String(second.player.id), 'it', { numeric: true });
