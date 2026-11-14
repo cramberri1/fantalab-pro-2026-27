@@ -860,6 +860,9 @@ export function simulateLineup(starters, options = {}) {
   }
   if (method !== 'events') {
     const samples = [...eligibleStarters, ...eligibleReserves].flatMap((entry) => entry.analysis.projection.sample ?? []);
+    if (method === 'official-history' && samples.some(sample => sample.calibrationModel === 'adaptive')) {
+      notes.push('Forma recente attiva. La taratura ha ridotto l’errore sui fantapunti e sulla probabilità di voto nella verifica prepartita dei tuoi Excel.');
+    }
     const rounds = [...new Set(samples.flatMap((sample) => sample.rounds ?? [sample.asOfRound]))].sort((a, b) => a - b);
     if (rounds.length) {
       const description = method === 'league-average'

@@ -21,6 +21,7 @@ export function renderAnalisi({
   const playersWithVotes = dataset.players.filter(p => p.ratings?.some(r => Number.isFinite(r.fantasyRating))).length;
   const sample = Number.isFinite(xg) && Number.isFinite(xgMatches);
   const validation = matchValidation();
+  const calibration = validation?.goalCalibration;
   return `${heading('Analisi',description)}
     <div class="metrics" aria-label="Copertura dell’analisi">
       ${metric('Risultati 2026/27',number(coveredFixtures),'Partite concluse acquisite','pitch')}
@@ -48,11 +49,13 @@ export function renderAnalisi({
     <div class="split overview-rounds">${votesPanel()}
       <section class="panel"><h2>Verifica retrospettiva 1X2</h2>
         ${validation?.matches ? `<p>${number(validation.matches)} partite 2026/27. Per ogni partita il modello usa soltanto risultati dei giorni precedenti. Il riferimento usa le medie casa e trasferta di Serie A.</p>
-        <p>I primi tre punteggi valutano i singoli metodi. La replica applica per ogni partita il metodo che FantaLab avrebbe scelto prima del calcio d’inizio.</p>
+        <p>La replica applica a ogni partita il metodo e la taratura che FantaLab avrebbe scelto prima del calcio d’inizio.</p>
         <div class="table-wrap"><table><thead><tr><th>Metodo</th><th>Brier</th><th>Log loss</th></tr></thead><tbody>
-        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes],['Replica della scelta prepartita',validation.replay]].map(([label, scores]) =>
+        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes],['Replica senza taratura gol',calibration?.unscaledReplay],['Replica della scelta prepartita',validation.replay]].map(([label, scores]) =>
           `<tr><th scope="row">${label}</th><td>${number(scores?.brier,4)}</td><td>${number(scores?.logLoss,4)}</td></tr>`).join('')}</tbody></table></div>
-        <p>Modello attuale · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. La correzione si attiva dopo almeno 50 gare di confronto, se migliora entrambi i punteggi. Nel campione è stata valutata su ${number(validation.dixonColesMatches)} gare e usata per ${number(validation.replay.dixonColesMatches)} previsioni nella replica. Valori più bassi indicano previsioni migliori sul campione.</p>`
+        <p>Modello attuale · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. Dixon–Coles si attiva dopo almeno 50 gare di confronto, se migliora entrambi i punteggi.</p>
+        ${calibration ? `<p>Taratura gol ${calibration.applied ? `attiva · fattore ${number(calibration.multiplier,3)}` : 'in verifica'} · ${number(calibration.evaluatedMatches)} partite di confronto.</p>
+          ${calibration.evaluatedMatches ? `<p>Devianza del totale gol sullo stesso campione · ${number(calibration.fixed.goalDeviance,3)} senza taratura · ${number(calibration.adaptive.goalDeviance,3)} con taratura. Valori più bassi indicano meno errore.</p>` : ''}` : ''}`
         : '<p>Verifica disponibile con l’archivio della stagione precedente e risultati acquisiti.</p>'}</section>
     </div>`;
 }

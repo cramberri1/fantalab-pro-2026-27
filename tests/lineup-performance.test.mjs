@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateLineupPerformance } from '../js/lineup-performance.js';
+import { evaluateLineupPerformance, summarizeLineupAccuracy } from '../js/lineup-performance.js';
 
 const makePlayer = (id, position, expectedPoints = null) => ({ id, name: id, position, expectedPoints });
 const forecast = {
@@ -65,4 +65,15 @@ test('keeps published and local bases separate and excludes partial projections 
     player.id === 'a' ? { fantasyRating: 5, source: 'TransferBeat' } : local(player, ...args));
   assert.equal(mixed.actualPoints, null);
   assert.match(mixed.reason, /fonti diverse/);
+});
+
+test('summaries use comparable forecasts and the subset with persisted percentiles', () => {
+  const result = { sourceId: 'fantatb', source: 'FantaTB', actualPoints: 10, difference: -3 };
+  const evaluations = [
+    { forecast: { p10: 10, p90: 17 }, result },
+    { forecast: { p10: 12, p90: 14 }, result: { ...result, difference: 1 } },
+    { forecast: {}, result: { ...result, difference: 2 } },
+    { forecast: {}, result: { ...result, difference: null } }
+  ];
+  assert.deepEqual(summarizeLineupAccuracy(evaluations), [{ source: 'FantaTB', count: 3, mae: 2, bias: 0, intervals: 2, covered: 1 }]);
 });

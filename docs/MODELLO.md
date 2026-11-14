@@ -32,6 +32,10 @@ In modalità reale, la stima del fantapunteggio privilegia le basi di voto dispo
 
 Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. A parità di copertura ha precedenza l’Excel Voti Fantacalcio.it, seguito da CSV di lega, listone Excel, FantaTB e statistiche di gioco. La tabella mostra il metodo impiegato e le eventuali esclusioni.
 
+### Taratura sui voti di giornata
+
+L’app ricalcola localmente la verifica a ogni importazione, rimozione o modifica della redazione o delle regole Classic. Per ciascun turno completo il confronto usa solo i risultati e i voti dei giorni precedenti. Confronta la media storica con un metodo che pesa maggiormente gli ultimi turni e avvicina il voto base alla media del ruolo. Le frequenze dei singoli eventi continuano a usare le osservazioni del giocatore e del ruolo. La forma recente si attiva soltanto con almeno 150 previsioni individuali su quattro turni di verifica e una riduzione di almeno l’1% per entrambi gli errori. Il report mostra il Brier della probabilità di voto, l’errore medio assoluto in fantapunti e la replica della scelta compiuta prima di ogni turno. I senza voto verificati valgono zero nell’errore individuale. Le identità irrisolte e le giornate parziali restano escluse dalla verifica.
+
 Con il metodo Excel, se l’indice da statistiche di gioco è assente, la probabilità di voto pesa il 65% e la media voto pesa il 35%. La media voto è riportata su una scala da 0 a 100 fra 4 e 8. Se manca, la probabilità di voto viene riscalata e la copertura resta al 65%. La fantamedia alimenta il punteggio atteso. Partite a voto, voto e fantavoto sono distinti da presenze, minuti e statistiche di gioco.
 
 Le segnalazioni manuali valgono per la giornata indicata e hanno precedenza sulla fonte automatica. Indisponibilità e squalifica azzerano l’impiego, il dubbio lo riduce del 25% e la diffida ha valore informativo. Il backup include segnalazioni e formazioni di riferimento. L’annullamento dell’ultima modifica per giornata vale durante la sessione.
@@ -40,6 +44,8 @@ Le segnalazioni manuali valgono per la giornata indicata e hanno precedenza sull
 
 Il Match Center stima i gol di casa e trasferta dai risultati precedenti al giorno italiano della partita. Combina attacco e difesa sul rispettivo campo e mostra il rapporto fra le medie gol casa e trasferta. Le gare 2025/26 contribuiscono fino a quattro partite equivalenti per squadra e campo. La correzione Dixon–Coles ripesa 0–0, 0–1, 1–0 e 1–1. Si attiva dopo almeno 50 gare di confronto, quando riduce sia Brier sia log loss rispetto al Poisson per squadra. **Analisi** confronta i due modelli e il Poisson di campionato. [Dixon e Coles](https://doi.org/10.1111/1467-9876.00065)
 
+La taratura automatica del totale gol usa lo scarto fra gol osservati e attesi nelle gare precedenti. Il fattore comune per casa e trasferta è limitato a 0,8–1,2 e tende a 1 con campioni piccoli. Si attiva se migliora la devianza del totale gol senza aumentare Brier e log loss 1X2, dopo almeno 30 confronti prospettici su almeno quattro date. La replica dell’intera politica include sia le date con taratura attiva sia quelle senza.
+
 ## Simulazione Monte Carlo
 
 Per ogni prova il simulatore estrae l’impiego. Quando il Match Center stima la partita, estrae un punteggio comune e attribuisce gol e assist ai calciatori in base al minutaggio e alle frequenze. Parte degli eventi può spettare al resto della squadra. Le reti subite del portiere derivano dallo stesso punteggio, ponderate per la presenza in campo. Il flag rigorista aumenta il peso di assegnazione dei rigori segnati dove il tasso è acquisito. Se il punteggio comune manca, la simulazione usa frequenze individuali indipendenti. I percentili P10, P50 e P90 sono ricavati dalle prove riproducibili a parità di input e seme.
@@ -47,6 +53,8 @@ Per ogni prova il simulatore estrae l’impiego. Quando il Match Center stima la
 Il suggeritore massimizza la somma delle stime individuali degli undici titolari. Usa una sola base di punteggio e ordina la panchina per punti attesi. La stima del suggeritore è precedente alle sostituzioni e alle correlazioni della simulazione. Il confronto tra formazioni usa invece due simulazioni con gli stessi dati e lo stesso limite di cambi.
 
 **Rendimento** confronta le previsioni salvate prima della giornata con i fantavoti osservati. Una riga senza voto esplicita può attivare una sostituzione. Una riga mancante resta ignota. Lo scarto viene mostrato quando il totale è risolvibile e le fonti di punteggio sono confrontabili.
+
+Per ogni base di punteggio confrontabile, **Rendimento** aggrega errore assoluto medio, scarto medio e frequenza con cui il totale cade nell’intervallo P10–P90 salvato prima del turno. Le previsioni vecchie senza percentili alimentano soltanto le statistiche sull’errore.
 
 Le riserve vengono provate nell’ordine impostato dall’utente. Ciascuna può sostituire un titolare senza presenza simulata dello stesso ruolo, fino al limite di sostituzioni. Quando mancano dati per un titolare, il risultato indica copertura parziale e mostra il giocatore tra gli esclusi. Il calcolo di una giornata richiede un incontro verificato per ogni giocatore incluso. Le proiezioni riguardano le partite da giocare e usano le statistiche disponibili alla data dell’archivio.
 

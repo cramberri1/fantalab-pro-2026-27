@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { backtestMatches, predictMatch } from '../js/match-model.js';
+import { backtestMatches, predictMatch, predictMatchRates } from '../js/match-model.js';
 
 const prior = Array.from({ length: 12 }, () => ({
   date: '2026-05-20', homeId: 'alpha', awayId: 'beta', homeGoals: 2, awayGoals: 1
@@ -38,10 +38,13 @@ test('requires enough prior results to score a fixture with or without an archiv
   const result = predictMatch(target, current);
   assert.equal(result.priorMatches, 0);
   assert.equal(result.currentMatches, 12);
+  const emptyMetrics = { brier: null, logLoss: null, goalDeviance: null };
   assert.deepEqual(backtestMatches([completed]), {
     matches: 0, excluded: 1, dixonColesMatches: 0, selectedModel: 'poisson',
     model: { brier: null, logLoss: null }, baseline: { brier: null, logLoss: null },
-    dixonColes: { brier: null, logLoss: null }, replay: { brier: null, logLoss: null, dixonColesMatches: 0 }
+    dixonColes: { brier: null, logLoss: null }, replay: { ...emptyMetrics, dixonColesMatches: 0 },
+    goalCalibration: { applied: false, multiplier: 1, candidateMultiplier: null, learningMatches: 0, evaluatedMatches: 0, evaluatedDays: 0,
+      replayAppliedMatches: 0, fixed: emptyMetrics, adaptive: emptyMetrics, unscaledReplay: emptyMetrics }
   });
 });
 
@@ -129,4 +132,65 @@ test('keeps the existing Poisson prediction when the calibrated correction perfo
   const result = predictMatch(drawTarget, decisive, drawPrior);
   assert.equal(result.model, 'poisson');
   assert.equal(result.rho, null);
+});
+
+const highScoringPrior = Array.from({ length: 100 }, (_, index) => ({
+  ...draw, date: isoDay('2025-09-01', index), homeGoals: 4, awayGoals: 1
+}));
+const lowScoringSeason = Array.from({ length: 70 }, (_, index) => ({ ...draw, date: isoDay('2026-07-01', index) }));
+const calibrationTarget = { ...target, date: '2026-10-01' };
+
+test('learns a bounded goal correction and applies it only after a walk-forward holdout', () => {
+  const warmup = predictMatch(calibrationTarget, lowScoringSeason.slice(0, 29), highScoringPrior).goalCalibration;
+  assert.equal(warmup.candidateMultiplier, null);
+  const tooFew = predictMatch(calibrationTarget, lowScoringSeason.slice(0, 59), highScoringPrior).goalCalibration;
+  assert.equal(tooFew.candidateMultiplier, 0.8);
+  assert.equal(tooFew.evaluatedMatches, 29);
+  assert.equal(tooFew.applied, false);
+
+  const singleDay = [...lowScoringSeason.slice(0, 30), ...lowScoringSeason.slice(30, 60).map(fixture =>
+    ({ ...fixture, date: lowScoringSeason[30].date }))];
+  const concentrated = backtestMatches(singleDay, highScoringPrior).goalCalibration;
+  assert.equal(concentrated.evaluatedMatches, 30);
+  assert.equal(concentrated.evaluatedDays, 1);
+  assert.ok(concentrated.adaptive.goalDeviance < concentrated.fixed.goalDeviance);
+  assert.equal(concentrated.applied, false);
+
+  const newTeams = { ...calibrationTarget, homeId: 'gamma', awayId: 'delta' };
+  const raw = predictMatchRates(newTeams, lowScoringSeason, highScoringPrior);
+  const adjusted = predictMatch(newTeams, lowScoringSeason, highScoringPrior);
+  const report = backtestMatches(lowScoringSeason, highScoringPrior);
+  assert.equal(adjusted.goalCalibration.applied, true);
+  assert.equal(adjusted.goalCalibration.multiplier, 0.8);
+  assert.ok(adjusted.homeRate + adjusted.awayRate < raw.homeRate + raw.awayRate);
+  assert.equal(report.goalCalibration.replayAppliedMatches, 10);
+  assert.ok(report.goalCalibration.adaptive.goalDeviance < report.goalCalibration.fixed.goalDeviance);
+});
+
+test('rejects a goal adjustment that improves goal deviance but damages 1X2 probabilities', () => {
+  const transition = lowScoringSeason.slice(0, 60).map((fixture, index) =>
+    index < 30 ? fixture : { ...fixture, homeGoals: 5 });
+  const report = backtestMatches(transition, highScoringPrior);
+  const { goalCalibration } = report;
+  assert.equal(goalCalibration.evaluatedMatches, 30);
+  assert.equal(goalCalibration.candidateMultiplier, 1.2);
+  assert.ok(goalCalibration.adaptive.goalDeviance < goalCalibration.fixed.goalDeviance);
+  assert.ok(goalCalibration.adaptive.logLoss > goalCalibration.fixed.logLoss);
+  assert.equal(goalCalibration.applied, false);
+  assert.equal(goalCalibration.multiplier, 1);
+});
+
+test('ignores same-day and future games in the active goal adjustment and faithfully replays it', () => {
+  const forecast = predictMatch(calibrationTarget, lowScoringSeason, highScoringPrior);
+  const extra = [{ ...draw, kickoff: '2026-09-30T22:15:00Z', homeGoals: 8, awayGoals: 8 },
+    { ...draw, date: '2026-10-02', homeGoals: 8, awayGoals: 8 }];
+  assert.equal(forecast.goalCalibration.applied, true);
+  assert.deepEqual(predictMatch(calibrationTarget, [...lowScoringSeason, ...extra], highScoringPrior), forecast);
+
+  const predictions = lowScoringSeason.map(fixture => predictMatch(fixture, lowScoringSeason, highScoringPrior));
+  const report = backtestMatches(lowScoringSeason, highScoringPrior);
+  const logLoss = -predictions.reduce((sum, { probabilities }) => sum + Math.log(probabilities[1]), 0);
+  assert.equal(report.goalCalibration.replayAppliedMatches,
+    predictions.filter(({ goalCalibration }) => goalCalibration.applied).length);
+  assert.ok(Math.abs(report.replay.logLoss - logLoss / lowScoringSeason.length) < 1e-12);
 });

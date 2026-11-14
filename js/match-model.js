@@ -5,6 +5,11 @@ const PRIOR_TEAM_WEIGHT = 4;
 const NEUTRAL_TEAM_WEIGHT = 6;
 const MIN_DIXON_COLES_SAMPLE = 50;
 const MAX_RHO_HUNDREDTHS = 18;
+const MIN_GOAL_LEARNING_MATCHES = 30;
+const MIN_GOAL_VALIDATION_MATCHES = 30;
+const MIN_GOAL_VALIDATION_DAYS = 4;
+const GOAL_PRIOR_MATCHES = 40;
+const GOAL_RATE_BOUNDS = [0.8, 1.2];
 
 function matchDay(fixture) {
   if (!fixture?.homeId || !fixture.awayId || fixture.homeId === fixture.awayId) return null;
@@ -165,6 +170,26 @@ function accumulate(loss, probabilities, outcome) {
   loss.logLoss -= Math.log(probabilities[outcome]);
 }
 
+function goalDeviance(observed, expected) {
+  return 2 * (expected - observed + (observed ? observed * Math.log(observed / expected) : 0));
+}
+
+function scaledRates(rates, multiplier) {
+  return { homeRate: boundRate(rates.homeRate * multiplier), awayRate: boundRate(rates.awayRate * multiplier) };
+}
+
+function goalCalibration(learned, validation) {
+  const { learningMatches, observed, expected } = learned;
+  const { matches: evaluatedMatches, days: evaluatedDays, fixed, adaptive } = validation;
+  const weight = learningMatches / (learningMatches + GOAL_PRIOR_MATCHES);
+  const candidateMultiplier = learningMatches < MIN_GOAL_LEARNING_MATCHES ? null
+    : Math.max(GOAL_RATE_BOUNDS[0], Math.min(GOAL_RATE_BOUNDS[1], 1 + weight * (observed / expected - 1)));
+  const applied = candidateMultiplier !== null && candidateMultiplier !== 1 && evaluatedMatches >= MIN_GOAL_VALIDATION_MATCHES
+    && evaluatedDays >= MIN_GOAL_VALIDATION_DAYS
+    && adaptive.goalDeviance < fixed.goalDeviance && adaptive.brier <= fixed.brier && adaptive.logLoss <= fixed.logLoss;
+  return { applied, multiplier: applied ? candidateMultiplier : 1, candidateMultiplier, learningMatches, evaluatedMatches, evaluatedDays };
+}
+
 function evaluateModels(current, prior, cutoff = '9999-12-31') {
   const priorByDay = new Map();
   const currentByDay = new Map();
@@ -179,11 +204,17 @@ function evaluateModels(current, prior, cutoff = '9999-12-31') {
   const model = { brier: 0, logLoss: 0 };
   const baseline = { brier: 0, logLoss: 0 };
   const dixonColes = { brier: 0, logLoss: 0 };
-  const replay = { brier: 0, logLoss: 0 };
+  const replay = { brier: 0, logLoss: 0, goalDeviance: 0 };
+  const unscaledReplay = { brier: 0, logLoss: 0, goalDeviance: 0 };
+  const learned = { learningMatches: 0, observed: 0, expected: 0 };
+  const goalValidation = { matches: 0, days: 0,
+    fixed: { brier: 0, logLoss: 0, goalDeviance: 0 }, adaptive: { brier: 0, logLoss: 0, goalDeviance: 0 } };
   let replayDixonColesMatches = 0;
+  let replayAppliedMatches = 0;
   let fittedDay;
   let rho = null;
   let useCorrection = false;
+  let calibration;
   const preferDixonColes = () => dixonColesMatches >= MIN_DIXON_COLES_SAMPLE && dixonColes.brier < model.brier
     && dixonColes.logLoss < model.logLoss;
   const games = current.filter(game => game.day < cutoff).sort((a, b) => a.day.localeCompare(b.day));
@@ -199,26 +230,54 @@ function evaluateModels(current, prior, cutoff = '9999-12-31') {
       fittedDay = day;
       rho = fitDixonColes(observations, day);
       useCorrection = rho !== null && preferDixonColes();
+      calibration = goalCalibration(learned, goalValidation);
+      if (calibration.candidateMultiplier !== null) goalValidation.days++;
     }
     const corrected = rho === null ? original
       : correctedProbabilities(mass, homeRate, awayRate, feasibleRho(rho, homeRate, awayRate));
     accumulate(model, original, observation.outcome);
     accumulate(baseline, normalize(threeWayMass(leagueHomeRate, leagueAwayRate)), observation.outcome);
     accumulate(dixonColes, corrected, observation.outcome);
-    accumulate(replay, useCorrection ? corrected : original, observation.outcome);
+    const fixed = useCorrection ? corrected : original;
+    const total = fixture.homeGoals + fixture.awayGoals;
+    const expected = homeRate + awayRate;
+    const fixedDeviance = goalDeviance(total, expected);
+    let adaptive = fixed;
+    let adaptiveDeviance = fixedDeviance;
+    if (calibration.candidateMultiplier !== null) {
+      const adjusted = scaledRates(rates, calibration.candidateMultiplier);
+      const adjustedMass = threeWayMass(adjusted.homeRate, adjusted.awayRate);
+      adaptive = useCorrection ? correctedProbabilities(adjustedMass, adjusted.homeRate, adjusted.awayRate,
+        feasibleRho(rho, adjusted.homeRate, adjusted.awayRate)) : normalize(adjustedMass);
+      adaptiveDeviance = goalDeviance(total, adjusted.homeRate + adjusted.awayRate);
+      accumulate(goalValidation.fixed, fixed, observation.outcome);
+      accumulate(goalValidation.adaptive, adaptive, observation.outcome);
+      goalValidation.fixed.goalDeviance += fixedDeviance;
+      goalValidation.adaptive.goalDeviance += adaptiveDeviance;
+      goalValidation.matches++;
+    }
+    accumulate(unscaledReplay, fixed, observation.outcome);
+    unscaledReplay.goalDeviance += fixedDeviance;
+    accumulate(replay, calibration.applied ? adaptive : fixed, observation.outcome);
+    replay.goalDeviance += calibration.applied ? adaptiveDeviance : fixedDeviance;
+    if (calibration.applied) replayAppliedMatches++;
+    learned.learningMatches++;
+    learned.observed += total;
+    learned.expected += expected;
     observations.push(observation);
     if (rho !== null) dixonColesMatches++;
     if (useCorrection) replayDixonColesMatches++;
     matches++;
   }
-  const average = loss => ({
-    brier: matches ? loss.brier / matches : null,
-    logLoss: matches ? loss.logLoss / matches : null
-  });
+  const average = (loss, count = matches) => Object.fromEntries(Object.entries(loss).map(([key, value]) =>
+    [key, count ? value / count : null]));
   return {
     matches, dixonColesMatches, model: average(model), baseline: average(baseline),
     dixonColes: dixonColesMatches ? average(dixonColes) : { brier: null, logLoss: null },
     replay: { ...average(replay), dixonColesMatches: replayDixonColesMatches },
+    goalCalibration: { ...goalCalibration(learned, goalValidation), replayAppliedMatches,
+      fixed: average(goalValidation.fixed, goalValidation.matches), adaptive: average(goalValidation.adaptive, goalValidation.matches),
+      unscaledReplay: average(unscaledReplay) },
     selectedModel: preferDixonColes() ? 'dixon-coles' : 'poisson', observations
   };
 }
@@ -229,18 +288,22 @@ export function predictMatch(fixture, fixtures, priorFixtures = []) {
   const day = matchDay(fixture);
   const rates = ratesForMatch(fixture, day, current, prior, new Map());
   if (!rates) return null;
-  const { homeRate, awayRate, leagueHomeRate, leagueAwayRate } = rates;
+  const { leagueHomeRate, leagueAwayRate } = rates;
   const comparison = evaluateModels(current, prior, day);
   const model = comparison.selectedModel;
+  const { applied, multiplier, candidateMultiplier, learningMatches, evaluatedMatches, evaluatedDays } = comparison.goalCalibration;
+  const { homeRate, awayRate } = applied ? scaledRates(rates, multiplier) : rates;
   const rho = model === 'dixon-coles'
     ? feasibleRho(fitDixonColes(comparison.observations, day), homeRate, awayRate)
     : null;
   const mass = threeWayMass(homeRate, awayRate);
   return {
     ...rates,
+    homeRate, awayRate,
     probabilities: rho === null ? normalize(mass) : correctedProbabilities(mass, homeRate, awayRate, rho),
     baseline: normalize(threeWayMass(leagueHomeRate, leagueAwayRate)),
-    model, rho, selectionMatches: comparison.dixonColesMatches
+    model, rho, selectionMatches: comparison.dixonColesMatches,
+    goalCalibration: { applied, multiplier, candidateMultiplier, learningMatches, evaluatedMatches, evaluatedDays }
   };
 }
 

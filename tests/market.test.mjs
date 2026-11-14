@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMarket, compareMarketTrade, rankMarketReplacements } from '../js/market.js';
+import { buildMarket, compareMarketTrade, rankMarketReplacements, rankWeeklyMarketComparisons } from '../js/market.js';
 
 const teams = [
   { id: 'verde', name: 'FC Verde', shortName: 'Verde', code: 'VER' },
@@ -120,4 +120,24 @@ test('compares fixture points only on a common matchday and scoring basis', () =
   assert.equal(absence.delta.expectedPoints, 6);
   assert.equal(absence.projectionComparison.method, 'official-history');
   assert.equal(absence.projectionMismatch, false);
+});
+
+test('weekly ranking updates with more recent Excel observations on the same scoring basis', () => {
+  const incoming = { id: 'other', name: regular.name, teamId: 'verde', position: 'DEF' };
+  const candidates = (observations, asOfRound, edition = 'Italia') => {
+    const market = buildMarket({ listone: [held, regular], freeAgents: [regular], roster,
+      dataset: { ...dataset, players: [...roster, incoming] }, analyze: player => ({
+        expectedPoints: player.id === 'held' ? 4 : 6, fixture: { round: 12 }, projection: {
+          method: 'official-history', sample: { sourceId: `fantacalcio-xlsx:${player.id === 'held' ? 'Italia' : edition}`,
+            observations, votes: 3, asOfRound }
+        }
+      }) });
+    return rankMarketReplacements(market, 'roster:held').candidates;
+  };
+  assert.deepEqual(rankWeeklyMarketComparisons(candidates(4,11)), []);
+  assert.deepEqual(rankWeeklyMarketComparisons(candidates(8,9)), []);
+  assert.deepEqual(rankWeeklyMarketComparisons(candidates(8,11,'Statistico')), []);
+  const fresh = candidates(8,11);
+  assert.deepEqual(rankWeeklyMarketComparisons([...fresh,...fresh]), fresh);
+  assert.equal(fresh[0].delta.expectedPoints, 2);
 });

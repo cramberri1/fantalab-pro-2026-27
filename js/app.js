@@ -1,7 +1,7 @@
 import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, getAvailability, placeLineupPlayer, sanitizeScoring } from './model.js';
 import { decodeRosterCsv, makeRosterCsvId, readRosterCsv, readVotesCsv } from './roster-import.js';
 import { readMarketWorkbook } from './market-import.js';
-import { buildMarket, rankMarketReplacements, compareMarketTrade, indexLeagueStatistics } from './market.js';
+import { buildMarket, rankMarketReplacements, rankWeeklyMarketComparisons, compareMarketTrade, indexLeagueStatistics } from './market.js';
 import { fixtureCalendarDay, getRoundWindow, isPendingFixture } from './calendar.js';
 import { predictMatch, backtestMatches, matchScoreSampler, predictMatchRates } from './match-model.js';
 import { wireLineupDrag } from './lineup-drag.js';
@@ -10,7 +10,7 @@ import { compareLineups, renderLineupComparison } from './lineup-comparison.js';
 import { manualAvailabilityRecord, sanitizeManualAvailability, renderManualAvailability, lineupManualLabel } from './manual-availability.js';
 import { buildFixtureDifficulty, renderFixtureDifficulty } from './fixture-difficulty.js';
 import { suggestLineup } from './lineup-suggestion.js';
-import { evaluateLineupPerformance } from './lineup-performance.js';
+import { evaluateLineupPerformance, summarizeLineupAccuracy } from './lineup-performance.js';
 import { OFFICIAL_VOTE_EDITIONS, officialVotesSeason, readOfficialVotesWorkbook, bindOfficialVoteRows } from './official-votes.js';
 import { buildOfficialVoteIndex } from './official-vote-model.js';
 import { cleanOfficialArchive, readOfficialArchive, writeOfficialArchive } from './official-vote-storage.js';
@@ -225,6 +225,7 @@ function sanitizeForecasts(value) {
     const ids = new Set(starters.map(p => p.id));
     const reserves = players(raw.reserves.slice(0,1000)).filter(p => !ids.has(p.id) && ids.add(p.id));
     forecasts[day] = { round:raw.round, season:raw.season, asOf:raw.asOf, expectedPoints:raw.expectedPoints,
+      p10:Number.isFinite(raw.p10) ? raw.p10 : null, p90:Number.isFinite(raw.p90) ? raw.p90 : null,
       starters, reserves, coverage:Number.isFinite(raw.coverage) ? Math.max(0,Math.min(1,raw.coverage)) : null,
       complete:raw.complete === true, method:typeof raw.method === 'string' ? raw.method.slice(0,50) : null,
       source:typeof raw.source === 'string' ? raw.source.slice(0,120) : null,
@@ -473,6 +474,7 @@ function matchCard(fixture) {
       <p>Gol attesi dal modello · casa ${number(prediction.homeRate,2)} · trasferta ${number(prediction.awayRate,2)}.</p>
       <p>${prediction.model === 'dixon-coles' ? 'Poisson con correzione Dixon–Coles' : 'Poisson per squadra'} · fattore campo ${number(prediction.homeAdvantage, 2)}.
       Campione · ${number(prediction.currentMatches)} risultati della stagione${prediction.priorMatches ? ` · ${number(prediction.priorMatches)} risultati 2025/26` : ''}.</p>
+      ${prediction.goalCalibration?.applied ? `<p>Taratura dei gol attiva · fattore ${number(prediction.goalCalibration.multiplier,3)} · ${number(prediction.goalCalibration.evaluatedMatches)} partite di verifica.</p>` : ''}
       ${mode === 'real' ? '<a class="text-link" href="#analisi">Verifica retrospettiva del modello</a>' : ''}</div>`
       : scheduled ? empty('Risultati precedenti insufficienti per stimare le probabilità 1X2.') : ''}
     <div class="duel"><h3>Indisponibilità segnalate</h3>${absences.length ? `<ul>${absences.map(a => `<li>${html(getPlayer(a.playerId)?.name ?? a.playerId)} · ${html(statusLabels[a.status] ?? 'Stato mancante')}${a.reason ? ` · ${html(a.reason)}` : ''}</li>`).join('')}</ul>`
@@ -1101,6 +1103,17 @@ async function updateOfficialSettings({ edition, remove, relink }) {
     refreshOfficialPanel();
   }
 }
+function officialCalibrationPanel() {
+  const report = officialVoteIndex().validation({ season: dataset.season, fixtures: dataset.fixtures });
+  return `<div class="duel" id="official-calibration"><h3>Verifica prepartita sui tuoi voti</h3>
+    <p>${report.model === 'adaptive' ? 'Forma recente attiva' : 'Media storica attiva'} · ${html(officialArchive.edition)} · ${number(report.samples)} previsioni individuali su ${number(report.rounds)} giornate complete.</p>
+    <p>La forma recente si attiva dopo almeno ${number(report.minimumSamples)} previsioni su ${number(report.minimumRounds)} giornate di verifica, se riduce di almeno l’1% sia l’errore sui fantapunti sia il Brier della probabilità di voto.</p>
+    ${report.samples ? `<details><summary>Precisione sui voti importati</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Verifica sui voti di giornata">
+    <table><thead><tr><th>Metodo</th><th>Errore medio assoluto (punti)</th><th>Brier voto</th></tr></thead><tbody>
+      ${[['Media storica',report.history],['Forma recente',report.adaptive],['Replica della scelta prepartita',report.replay]].map(([label, result]) =>
+        `<tr><th scope="row">${label}</th><td>${number(result.mae,2)}</td><td>${number(result.brier,3)}</td></tr>`).join('')}
+    </tbody></table></div><p>Ogni giornata è stimata con i soli turni precedenti già conclusi. I senza voto verificati valgono zero fantapunti in questa verifica individuale. Valori più bassi indicano meno errore.</p></details>` : ''}</div>`;
+}
 function officialVotesPanel() {
   const days = [...officialArchive.days].sort((first, second) => second.season.localeCompare(first.season) || second.round - first.round);
   const latest = days.find(day => day.season === dataset.season);
@@ -1117,6 +1130,7 @@ function officialVotesPanel() {
       <option>2026/27</option><option>2025/26</option></select></label><button type="submit">Importa file confermati</button>
       <button type="button" data-official-cancel>Annulla</button></form>` : ''}
     ${officialMessage ? `<p class="inline-status" role="status">${html(officialMessage)}</p>` : ''}
+    ${latest && !officialBusy ? officialCalibrationPanel() : ''}
     ${days.map(day => {
       const ambiguous = day.unmatched.filter(row => row.ambiguous).length;
       const matched = day.rows.filter(row => row.id).length;
@@ -1318,6 +1332,7 @@ function saveForecast() {
   const forecast = { season:dataset.season, round, asOf:new Date().toISOString(),
     starters:players(record.starters).map(player => ({ ...player, teamId:getPlayer(player.id)?.teamId })),
     reserves:players(record.reserves), maxSubstitutions:record.maxSubstitutions, expectedPoints:simulationResult.mean,
+    p10:simulationResult.p10, p90:simulationResult.p90,
     coverage:simulationResult.coverage, complete:!simulationResult.excluded.length && method !== 'events' && !(official && modeState().scoring?.defenseModifier),
     method, source, sourceId:official ? officialSourceKey(official) : method === 'fantatb-history' ? 'fantatb' : null };
   forecast.reserves = forecast.reserves.map(player => ({ ...player, teamId:getPlayer(player.id)?.teamId }));
@@ -1350,7 +1365,7 @@ function realizedVote(player, day, season, basis) {
 }
 function rendimento() {
   return renderRendimento({
-    modeState, heading, votesByPlayer, officialArchive, evaluateLineupPerformance, mode, realizedVote,
+    modeState, heading, votesByPlayer, officialArchive, evaluateLineupPerformance, summarizeLineupAccuracy, mode, realizedVote,
     html, projectionLabel, date, percent, stat, number
   });
 }
@@ -1552,6 +1567,13 @@ function marketList(profiles, comparisons, trade) {
     <span aria-live="polite">Pagina ${marketFilters.page} / ${pages} · ${number(profiles.length)} calciatori</span>
     <button data-market-page="1" ${marketFilters.page === pages ? 'disabled' : ''}>Successiva →</button></div>`;
 }
+function weeklyMarketSuggestions(comparisons) {
+  const ranked = rankWeeklyMarketComparisons(comparisons);
+  if (!ranked.length) return '';
+  return `<section class="market-suggestions"><h3>Alternative per la giornata ${ranked[0].projectionComparison.round}</h3>
+    <p class="muted">Differenza stimata per una partita, con i voti Excel della stessa redazione.</p>
+    <ul>${ranked.map(result => `<li>${html(result.outgoing.name)} → ${html(result.incoming.name)} · ${marketDelta(result.delta.expectedPoints,2)} fantapunti attesi</li>`).join('')}</ul></section>`;
+}
 function marketResults(market) {
   const tab = marketFilters.tab;
   const outgoing = marketOutgoing(market);
@@ -1577,6 +1599,7 @@ function marketResults(market) {
     const comparison = outgoing && marketFilters.incoming
       ? compareMarketTrade(market, outgoing.key, marketFilters.incoming, { creditDifference: creditInput(marketFilters.credits) }) : null;
     return `${rosterHint}${outgoing ? '' : '<p class="inline-status">Seleziona un giocatore in uscita per confrontare uno scambio a parità di ruolo.</p>'}
+      ${weeklyMarketSuggestions(ranked)}
       ${comparison ? marketCard(comparison,true) : suggestions.length ? `<div class="market-suggestions"><h3>Scambi da valutare</h3>
         ${suggestions.map(result => marketCard(result,true)).join('')}</div>` : ''}
       ${marketList(assigned,comparisons,Boolean(outgoing))}`;
@@ -1587,18 +1610,20 @@ function marketResults(market) {
   const ranked = outgoing ? rank(outgoing.key).filter(c => marketMatch(c.incoming)) : [];
   const candidates = outgoing ? ranked.map(c => c.incoming) : eligible;
   const comparisons = outgoing ? new Map(ranked.map(c => [c.incoming.key,c])) : null;
+  const rosterOptions = outgoing ? [] : market.roster.filter(p => !marketFilters.role || p.position === marketFilters.role)
+    .map(p => rank(p.key).filter(c => marketMatch(c.incoming)));
   const suggestions = outgoing
     ? ranked.filter(c => c.signal === 'upgrade').slice(0,3)
-    : market.roster.filter(p => !marketFilters.role || p.position === marketFilters.role)
-      .flatMap(p => rank(p.key).filter(c => c.signal === 'upgrade' && marketMatch(c.incoming)).slice(0,1))
+    : rosterOptions.flatMap(options => options.filter(c => c.signal === 'upgrade').slice(0,1))
       .sort((a,b) => b.delta.score - a.delta.score)
       .filter((item,index,all) => all.findIndex(other => other.incoming.key === item.incoming.key) === index).slice(0,5);
   const offList = market.roster.filter(p => p.offList && (!marketFilters.role || p.position === marketFilters.role));
   return `${rosterHint}
     ${offList.length ? `<p class="notice neutral"><strong>Fuori lista nella tua rosa</strong> ${offList.map(p => html(p.name)).join(', ')}.</p>` : ''}
-    ${suggestions.length ? `<div class="market-suggestions"><h3>Migliori sostituzioni</h3><p class="muted">Ogni proposta è un confronto indipendente a parità di ruolo.</p>
+    ${weeklyMarketSuggestions(outgoing ? ranked : rosterOptions.flat())}
+    ${suggestions.length ? `<div class="market-suggestions"><h3>Migliori sostituzioni</h3><p class="muted">Confronti a parità di ruolo ordinati per indice storico del listone.</p>
       ${suggestions.map(result => marketCard(result)).join('')}</div>`
-      : market.roster.length ? '<p class="inline-status">Nessun miglioramento con evidenza sufficiente per i filtri selezionati.</p>' : ''}
+      : market.roster.length ? '<p class="inline-status">Nessun miglioramento nell’indice storico con i filtri selezionati.</p>' : ''}
     ${marketList(candidates,comparisons,false)}`;
 }
 function mercato() {

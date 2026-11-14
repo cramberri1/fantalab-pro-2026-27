@@ -97,3 +97,57 @@ test('Synthetic official draws preserve base vote and approximate the analytical
   }
   assert.ok(Math.abs(points / 18000 - projection.scores[0]) < 0.05);
 });
+
+function validationData(change = true) {
+  const players = Array.from({ length: 60 }, (_, index) => ({ ...player, id: `learning-${index}`, teamId: index < 30 ? 'alfa' : 'beta' }));
+  const fixtures = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 8, 1 + index * 3)).toISOString().slice(0,10);
+    return match(index + 1, index === 11 ? 'scheduled' : 'played', date);
+  });
+  const days = fixtures.slice(0,-1).map(({ round }) => day(round, players
+    .filter((person,index) => !change || round <= 3 || index % 2 === 0).map(person => row(person, 6))));
+  return { players, days, fixtures };
+}
+
+test('Walk-forward validation selects recent form after enough evidence and tracks the replay separately', () => {
+  const { players, days, fixtures } = validationData();
+  const archive = buildOfficialVoteIndex(days);
+  const report = archive.validation({ season, fixtures, asOf: '2026-10-05' });
+  assert.equal(report.rounds, 8);
+  assert.equal(report.samples, 480);
+  assert.equal(report.model, 'adaptive');
+  assert.equal(report.adaptiveRounds, 4);
+  assert.ok(report.adaptive.brier < report.history.brier);
+  assert.ok(report.adaptive.mae < report.history.mae);
+  const earlier = archive.validation({ season, fixtures, asOf: '2026-09-16' });
+  assert.equal(earlier.model, 'history');
+  const forecast = archive.project(players[1], { season, fixtures, fixture: fixtures.at(-1), asOf: '2026-10-03' });
+  assert.equal(forecast.sample.calibrationModel, 'adaptive');
+  assert.ok(forecast.voteProbability < 3 / 11);
+});
+
+test('Future vote files, final results on the same day and later transfers cannot alter an earlier estimate', () => {
+  const { players, days, fixtures } = validationData();
+  const subject = players[1];
+  const fixture = fixtures[7];
+  const target = { season, fixture, fixtures, asOf: fixture.date };
+  const earlier = buildOfficialVoteIndex(days.slice(0,7));
+  const all = buildOfficialVoteIndex([...days.slice(0,9),
+    day(10, [...days[9].rows, row({ ...subject, teamId: 'beta' }, 9)]), days[10]]);
+  const first = earlier.project(subject, target);
+  assert.deepEqual(all.project(subject, target), first);
+  assert.equal(first.sample.asOfRound, 7);
+  assert.equal(all.validation({ ...target, beforeRound: 8 }).rounds, 4);
+  const sameDay = fixtures.map(game => game.round === 7 ? { ...game, date:fixture.date } : game);
+  const earlierCutoff = all.project(subject, { ...target, fixtures:sameDay });
+  assert.equal(earlierCutoff.sample.asOfRound, 6);
+  assert.equal(earlierCutoff.sample.calibrationModel, 'history');
+});
+
+test('A perfect stable history keeps the simpler candidate after validation', () => {
+  const { days, fixtures } = validationData(false);
+  const report = buildOfficialVoteIndex(days).validation({ season, fixtures, asOf: '2026-10-05' });
+  assert.equal(report.rounds, 8);
+  assert.equal(report.history.brier, 0);
+  assert.equal(report.model, 'history');
+});

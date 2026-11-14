@@ -1,16 +1,24 @@
 export function renderRendimento({
-  modeState, heading, votesByPlayer, officialArchive, evaluateLineupPerformance, mode, realizedVote,
+  modeState, heading, votesByPlayer, officialArchive, evaluateLineupPerformance, summarizeLineupAccuracy, mode, realizedVote,
   html, projectionLabel, date, percent, stat, number
 }) {
   const records = Object.values(modeState().forecasts).sort((a,b) => b.round - a.round);
+  const evaluations = records.map(forecast => {
+    const local = forecast.method === 'league-history' || (forecast.method !== 'fantatb-history' && forecast.starters.some(player =>
+      votesByPlayer.get(player.id)?.rows.some(row => row.round === forecast.round && row.season === forecast.season)));
+    const useOfficial = forecast.method === 'official-history' || (!['league-history','fantatb-history'].includes(forecast.method) &&
+      officialArchive.days.some(day => day.season === forecast.season && day.round === forecast.round));
+    const basis = useOfficial ? 'official' : local ? 'csv' : 'fantatb';
+    const result = evaluateLineupPerformance(forecast, (player, day, season) => mode === 'real' ? realizedVote(player, day, season, basis) : undefined);
+    return { forecast, result };
+  });
+  const accuracy = summarizeLineupAccuracy(evaluations);
   return `${heading('Rendimento della rosa', 'Confronta le previsioni salvate prima della giornata con i fantavoti acquisiti.')}
-    ${records.length ? records.map(forecast => {
-      const local = forecast.method === 'league-history' || (forecast.method !== 'fantatb-history' && forecast.starters.some(player =>
-        votesByPlayer.get(player.id)?.rows.some(row => row.round === forecast.round && row.season === forecast.season)));
-      const useOfficial = forecast.method === 'official-history' || (!['league-history','fantatb-history'].includes(forecast.method) &&
-        officialArchive.days.some(day => day.season === forecast.season && day.round === forecast.round));
-      const basis = useOfficial ? 'official' : local ? 'csv' : 'fantatb';
-      const result = evaluateLineupPerformance(forecast, (player, day, season) => mode === 'real' ? realizedVote(player, day, season, basis) : undefined);
+    ${accuracy.length ? `<section class="panel stacked"><h2>Precisione delle formazioni salvate</h2>
+      ${accuracy.map(group => `<div class="duel"><h3>${html(group.source)}</h3><p>${number(group.count)} giornate confrontabili.</p>
+        <div class="detail-grid">${stat('Errore medio assoluto',number(group.mae,2))}${stat('Scarto medio reale − atteso',number(group.bias,2))}
+        ${group.intervals ? stat('Dentro l’intervallo P10–P90',`${number(group.covered)}/${number(group.intervals)}`) : ''}</div></div>`).join('')}</section>` : ''}
+    ${evaluations.length ? evaluations.map(({ forecast, result }) => {
       return `<section class="panel stacked"><h2>Giornata ${forecast.round}</h2>
         <p>${html(projectionLabel(result.method))} · ${html(date(forecast.asOf))} · copertura previsione ${percent(result.expectedCoverage)}.</p>
         <div class="detail-grid">${stat('Fantapunti attesi',number(result.expectedPoints,2))}${stat('Fantapunti dai voti',number(result.actualPoints,2))}

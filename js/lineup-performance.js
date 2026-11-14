@@ -91,3 +91,22 @@ export function evaluateLineupPerformance(forecast, getVote) {
       : null
   };
 }
+
+export function summarizeLineupAccuracy(evaluations) {
+  const grouped = new Map();
+  for (const { forecast, result } of evaluations) {
+    if (!Number.isFinite(result.difference) || !result.sourceId) continue;
+    const group = grouped.get(result.sourceId) ?? { source: result.source, count: 0, absoluteError: 0, error: 0, intervals: 0, covered: 0 };
+    group.count++;
+    group.absoluteError += Math.abs(result.difference);
+    group.error += result.difference;
+    const { p10, p90 } = forecast;
+    if (Number.isFinite(p10) && Number.isFinite(p90) && p10 <= p90) {
+      group.intervals++;
+      if (result.actualPoints >= p10 && result.actualPoints <= p90) group.covered++;
+    }
+    grouped.set(result.sourceId, group);
+  }
+  return [...grouped.values()].map(({ source, count, absoluteError, error, intervals, covered }) =>
+    ({ source, count, mae: absoluteError / count, bias: error / count, intervals, covered }));
+}

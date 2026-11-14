@@ -163,6 +163,7 @@ function attachProjection(profile, publicPlayers, dataset, round, analyze) {
   if (profile.expectedPoints !== null && method && Number.isInteger(analysis.fixture.round)) {
     profile.projectionBasis = {
       method, round: analysis.fixture.round, source: sample?.sourceId ?? sample?.source ?? null,
+      lastObservedRound: sample?.asOfRound ?? null,
       sample: Number.isInteger(sample?.votes) && Number.isInteger(sample.observations)
         ? { votes: sample.votes, observations: sample.observations } : null
     };
@@ -352,6 +353,19 @@ export function rankMarketReplacements(market, outgoingKey, { maxReferencePrice,
   const total = candidates.length;
   const cap = Number.isInteger(limit) && limit >= 0 ? limit : total;
   return { outgoing, candidates: candidates.slice(0, cap), excluded, total };
+}
+
+export function rankWeeklyMarketComparisons(comparisons, limit = 3) {
+  const trusted = profile => {
+    const basis = profile.projectionBasis;
+    return basis?.method === 'official-history' && basis.source && basis.sample?.observations >= 5 && basis.sample.votes >= 3
+      && Number.isInteger(basis.lastObservedRound) && basis.lastObservedRound < basis.round && basis.round - basis.lastObservedRound <= 2;
+  };
+  const ranked = comparisons.filter(result => result.ok && result.delta.expectedPoints > 0 && result.projectionComparison
+    && trusted(result.outgoing) && trusted(result.incoming))
+    .sort((a,b) => b.delta.expectedPoints - a.delta.expectedPoints || a.incoming.name.localeCompare(b.incoming.name, 'it'));
+  const used = new Set();
+  return ranked.filter(result => !used.has(result.incoming.key) && used.add(result.incoming.key)).slice(0, limit);
 }
 
 export function compareMarketTrade(market, outgoingKey, incomingKey, { creditDifference } = {}) {

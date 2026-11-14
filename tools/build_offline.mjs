@@ -102,6 +102,7 @@ const views = await Promise.all([
 ].map(async ([path, namespace]) => ({ path, namespace, source: await read(`js/${path}`) })));
 const modules = [
   ...views,
+  { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar },
   { path: 'official-vote-model.js', namespace: 'FantaLabOfficialVoteModel', source: officialVoteModel },
   { path: 'model.js', namespace: 'FantaLabModel', source: model },
   { path: 'roster-import.js', namespace: 'FantaLabRosterImport', source: rosterImport },
@@ -109,7 +110,6 @@ const modules = [
   { path: 'official-votes.js', namespace: 'FantaLabOfficialVotes', source: officialVotes },
   { path: 'official-vote-storage.js', namespace: 'FantaLabOfficialVoteStorage', source: officialVoteStorage },
   { path: 'market.js', namespace: 'FantaLabMarket', source: market },
-  { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar },
   { path: 'lineup-drag.js', namespace: 'FantaLabLineupDrag', source: lineupDrag },
   { path: 'lineup-context.js', namespace: 'FantaLabLineupContext', source: lineupContext },
   { path: 'lineup-comparison.js', namespace: 'FantaLabLineupComparison', source: lineupComparison },
