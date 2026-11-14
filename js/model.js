@@ -2,6 +2,20 @@ const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
 const POSITION_LABELS = { GK: 'portieri', DEF: 'difensori', MID: 'centrocampisti', FWD: 'attaccanti' };
 export const FORMATION_OPTIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'];
 export const SCORING = Object.freeze({ appearance: 6, goal: 3, assist: 1, yellowCard: -0.5, goalkeeperConceded: -1 });
+export const CLASSIC_SCORING = Object.freeze({
+  goal: 3, assist: 1, yellowCard: -0.5, redCard: -1, goalkeeperConceded: -1,
+  penaltyScored: 3, penaltyMissed: -3, penaltySaved: 3, cleanSheet: 0, ownGoal: -2,
+  defenseModifier: false, defenseIncludesKeeper: true, defenseAt6: 1, defenseAt65: 3, defenseAt7: 6,
+});
+const FALLBACK_RATING_SD = { GK: 0.45, DEF: 0.45, MID: 0.45, FWD: 0.5 };
+
+export function sanitizeScoring(value) {
+  return Object.fromEntries(Object.entries(CLASSIC_SCORING).map(([key, defaultValue]) => {
+    const setting = value?.[key];
+    return [key, typeof defaultValue === 'boolean' ? (typeof setting === 'boolean' ? setting : defaultValue)
+      : Number.isFinite(setting) && Math.abs(setting) <= 30 ? setting : defaultValue];
+  }));
+}
 
 const COMPLETED = new Set(['finished', 'played', 'ft', 'aet', 'pen', 'awarded']);
 const PENDING = new Set(['scheduled', 'timed', 'upcoming', 'tbd', 'ns', 'not started']);
@@ -167,7 +181,11 @@ function fixtureProjection(player, fixture, completed) {
   return result;
 }
 
-function getAvailability(player, fixture, absences) {
+export function getAvailability(player, fixture, absences, manual) {
+  if (manual?.status === 'suspended' || manual?.status === 'out') {
+    return { status: 'out', reason: manual.reason || (manual.status === 'suspended' ? 'Squalificato' : 'Indisponibile'), multiplier: 0, source: 'manual' };
+  }
+  if (manual?.status === 'doubtful') return { status: 'doubtful', reason: manual.reason || 'In dubbio', multiplier: 0.75, source: 'manual' };
   const report = fixture && absences.find((item) => sameId(item.playerId, player.id) && sameId(item.fixtureId, fixture.id));
   const reported = statusKey(report?.status);
   if (RULED_OUT.has(reported)) return { status: 'out', reason: report.reason || report.status, multiplier: 0 };
@@ -236,12 +254,34 @@ function expectedScore(projection) {
   if (projection.appearanceProbability === 0) return 0;
   if (projection.goalRate == null || projection.assistRate == null) return null;
 
-  const bonusPer90 = SCORING.goal * projection.goalRate + SCORING.assist * projection.assistRate;
-  const concededPenalty = SCORING.goalkeeperConceded * (projection.concededRate ?? 0);
+  const rules = projection.scoring;
+  const eventRates = { goal: projection.goalRate, assist: projection.assistRate, goalkeeperConceded: projection.concededRate, ...projection.extraRates };
+  const pointsPer90 = sum(Object.entries(eventRates).map(([key, rate]) => rules[key] * (rate ?? 0)));
   return sum(projection.profiles.map((profile) => {
-    const yellowPenalty = SCORING.yellowCard * yellowProbability(projection.yellowRate, profile.minutes);
-    return profile.probability * (SCORING.appearance + profile.minutes / 90 * (bonusPer90 + concededPenalty) + yellowPenalty);
+    const yellowPenalty = rules.yellowCard * yellowProbability(projection.yellowRate, profile.minutes);
+    const cleanSheet = projection.concededRate == null ? 0 : rules.cleanSheet * Math.exp(-projection.concededRate * profile.minutes / 90);
+    return profile.probability * (SCORING.appearance + profile.minutes / 90 * pointsPer90 + yellowPenalty + cleanSheet);
   }));
+}
+
+function ratingSpread(dataset, position, fixture, asOf) {
+  const source = dataset.sources?.find(item => item.id === FANTASY_SOURCE);
+  const cutoff = fixtureTime(fixture);
+  if (!source?.archives?.length) return { sd: FALLBACK_RATING_SD[position], count: 0 };
+  const finalRounds = new Map();
+  for (const match of dataset.fixtures) {
+    const previous = COMPLETED.has(statusKey(match.status)) && fixtureTime(match) < cutoff && fixtureTime(match) <= asOf;
+    finalRounds.set(match.round, previous && (finalRounds.get(match.round) ?? true));
+  }
+  const available = new Set((source?.archives ?? []).filter(item => {
+    const published = Date.parse(item.updatedAt);
+    return finalRounds.get(item.round) && published < cutoff && published <= asOf;
+  }).map(item => item.round));
+  const votes = dataset.players.filter(player => player.position === position)
+    .flatMap(player => (player.ratings ?? []).filter(row => available.has(row.round) && finite(row.rating)).map(row => row.rating));
+  if (votes.length < 20) return { sd: FALLBACK_RATING_SD[position], count: votes.length };
+  const mean = average(votes);
+  return { sd: Math.sqrt(sum(votes.map(vote => (vote - mean) ** 2)) / (votes.length - 1)), count: votes.length };
 }
 
 function indexComponents(projection, teamGames, position) {
@@ -322,6 +362,7 @@ function leagueFantasy(record, dataset, fixture, sample, asOf) {
     voteProbability: gamesWithVote / teamGames,
     scores: [fantasyAverage],
     sample: {
+      averageRating: finite(sample.averageRating) ? sample.averageRating : null,
       observations: teamGames, votes: gamesWithVote, asOfRound,
       asOfDate: previous.map((match) => match.date ?? new Date(fixtureTime(match)).toISOString().slice(0, 10)).sort().at(-1),
     },
@@ -370,12 +411,31 @@ function empiricalAnalysis(record, result, dataset, options) {
   if (result.availability.status === 'unknown') notes.push('Disponibilità per la giornata non verificata.');
   if (result.availability.status === 'reported') notes.push(`Segnalazione senza esito confermato. ${result.availability.reason}.`);
   if (result.availability.status === 'doubtful') notes.push('Giocatore in dubbio. La probabilità di ricevere voto è ridotta del 25%.');
-  return { ...result, projection, expectedPoints: voteProbability * average(empirical.scores), notes, status: 'estimated' };
+  const indexFromVotes = method === 'league-average' ? leagueVoteIndex(voteProbability, sample.averageRating) : {};
+  return { ...result, ...indexFromVotes, projection, expectedPoints: voteProbability * average(empirical.scores), notes, status: 'estimated' };
+}
+
+function leagueVoteIndex(voteProbability, averageRating) {
+  const components = [
+    { id: 'vote', label: 'Probabilità di voto', value: 100 * voteProbability, weight: 65,
+      detail: 'Partite a voto sulle gare della squadra nel campione Excel, con eventuale correzione per disponibilità.' }
+  ];
+  if (finite(averageRating)) components.push({
+    id: 'average-rating', label: 'Media voto', value: clamp((averageRating - 4) / 4 * 100, 0, 100), weight: 35,
+    detail: 'Scala lineare da 4 (0 punti) a 8 (100 punti), con saturazione agli estremi.'
+  });
+  const weight = sum(components.map(component => component.weight));
+  for (const component of components) {
+    component.effectiveWeight = 100 * component.weight / weight;
+    component.contribution = component.value * component.weight / weight;
+  }
+  return { index: Math.round(sum(components.map(component => component.contribution))), components,
+    coverage: weight / 100, indexMethod: 'league-average' };
 }
 
 export function analyzePlayer(player, options = {}) {
   const { dataset, round, mode = dataset?.mode } = options;
-  const localPlayer = mode === 'real' && (options.fantasySample || options.leagueVotes) && typeof player?.id === 'string'
+  const localPlayer = mode === 'real' && (options.fantasySample || options.leagueVotes || options.manualAvailability) && typeof player?.id === 'string'
     && player.id.startsWith('csv:') && POSITIONS.includes(player.position)
     && (dataset?.teams ?? []).some((team) => sameId(team.id, player.teamId));
   const record = dataset?.players?.find((item) => sameId(item.id, player?.id)) ?? (localPlayer ? player : null);
@@ -401,7 +461,7 @@ export function analyzePlayer(player, options = {}) {
   const fixture = options.fixture === undefined
     ? getPlayerFixture(record, fixtures, round)
     : fixtures.find((match) => sameId(match.id, options.fixture?.id) && hasTeam(match, record.teamId)) ?? null;
-  const availability = getAvailability(record, fixture, dataset.absences ?? []);
+  const availability = getAvailability(record, fixture, dataset.absences ?? [], options.manualAvailability);
   const result = { ...base, fixture, availability };
   if (fixture && !PENDING.has(statusKey(fixture.status))) {
     const status = COMPLETED.has(statusKey(fixture.status)) ? 'historical' : 'insufficient';
@@ -419,7 +479,7 @@ export function analyzePlayer(player, options = {}) {
       appearanceProbability: 0, startProbability: 0, expectedMinutes: 0, goalRate: null, assistRate: null,
       goalRateSource: 'missing', assistRateSource: 'missing', matchFactor: null, concededRate: null, yellowRate: null, profiles: [],
     };
-    return { ...result, index: 0, expectedPoints: 0, unavailable: true, projection, status: 'unavailable', notes: [`Indisponibilità segnalata per la partita. ${availability.reason}.`] };
+    return { ...result, index: 0, expectedPoints: 0, unavailable: true, projection, status: 'unavailable', notes: [`Indisponibilità ${availability.source === 'manual' ? 'inserita manualmente' : 'segnalata per la partita'}. ${availability.reason}.`] };
   }
 
   if (options.method && options.method !== 'events') {
@@ -444,15 +504,27 @@ export function analyzePlayer(player, options = {}) {
   const goalRate = per90(record.goals, record.xg, record.minutes);
   const assistRate = per90(record.assists, record.xa, record.minutes);
   const matchup = fixtureProjection(record, fixture, completed);
+  const scoring = options.scoring ? sanitizeScoring(options.scoring) : sanitizeScoring();
+  const extraRates = Object.fromEntries(Object.entries({
+    penaltyScored: 'penaltiesScored', penaltyMissed: 'penaltiesMissed', penaltySaved: 'penaltiesSaved',
+    ownGoal: 'ownGoals', redCard: 'redCards'
+  }).filter(([key, field]) => present(record[field]) && record.minutes > 0 &&
+    (key !== 'penaltyScored' || present(record.goals) && record.penaltiesScored <= record.goals))
+    .map(([key, field]) => [key, record[field] * 90 / record.minutes]));
+  // Split known penalties from total goals. If xG includes penalties, its total is still counted once.
+  const totalGoalRate = goalRate.value == null ? null : goalRate.value * (matchup.attackFactor ?? 1);
+  if (totalGoalRate != null && extraRates.penaltyScored != null) extraRates.penaltyScored = Math.min(totalGoalRate, extraRates.penaltyScored);
   const projection = {
     method: 'events',
     ...playing,
     ...matchup,
-    goalRate: goalRate.value == null ? null : goalRate.value * (matchup.attackFactor ?? 1),
+    goalRate: totalGoalRate == null ? null : totalGoalRate - (extraRates.penaltyScored ?? 0),
     assistRate: assistRate.value == null ? null : assistRate.value * (matchup.attackFactor ?? 1),
     goalRateSource: goalRate.source,
     assistRateSource: assistRate.source,
     yellowRate: present(record.yellowCards) && record.minutes ? record.yellowCards * 90 / record.minutes : null,
+    scoring, extraRates, baseVote: ratingSpread(dataset, record.position, fixture, asOf),
+    penaltyTaker: Boolean(options.penaltyTaker),
   };
   const ratings = indexComponents({ ...projection, goalRate: goalRate.value, assistRate: assistRate.value }, teamGames, record.position);
   const expectedPoints = expectedScore(projection);
@@ -510,24 +582,98 @@ function poisson(lambda, rng) {
   return events;
 }
 
-function drawScore(projection, rng) {
+function drawAppearance(projection, rng) {
   const draw = rng();
   if (projection.voteProbability != null) {
     if (draw >= projection.voteProbability) return null;
-    return projection.scores[Math.floor(rng() * projection.scores.length)];
+    return { points: projection.scores[Math.floor(rng() * projection.scores.length)], vote: null };
   }
   let cumulative = 0;
   for (const profile of projection.profiles) {
     cumulative += profile.probability;
     if (draw >= cumulative) continue;
-    const exposure = profile.minutes / 90;
-    const goals = poisson((projection.goalRate ?? 0) * exposure, rng);
-    const assists = poisson((projection.assistRate ?? 0) * exposure, rng);
-    const conceded = poisson((projection.concededRate ?? 0) * exposure, rng);
-    const yellow = rng() < yellowProbability(projection.yellowRate, profile.minutes);
-    return SCORING.appearance + goals * SCORING.goal + assists * SCORING.assist + conceded * SCORING.goalkeeperConceded + Number(yellow) * SCORING.yellowCard;
+    const u = 1 - rng();
+    const vote = clamp(SCORING.appearance + projection.baseVote.sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng()), 0, 10);
+    return { vote, exposure: profile.minutes / 90, minutes: profile.minutes };
   }
   return null;
+}
+
+function drawEventScore(projection, appearance, rng, shared) {
+  const { vote, exposure, minutes } = appearance;
+  const rules = projection.scoring;
+  const goals = shared?.goals ?? poisson(projection.goalRate * exposure, rng);
+  const assists = shared?.assists ?? poisson(projection.assistRate * exposure, rng);
+  const conceded = projection.concededRate == null && shared?.conceded == null ? null
+    : shared?.conceded ?? poisson(projection.concededRate * exposure, rng);
+  const yellow = rng() < yellowProbability(projection.yellowRate, minutes);
+  const extra = sum(Object.entries(projection.extraRates).map(([key, rate]) =>
+    rules[key] * (key === 'penaltyScored' && shared ? shared.penalties : poisson(rate * exposure, rng))));
+  return vote + goals * rules.goal + assists * rules.assist + extra + Number(yellow) * rules.yellowCard
+    + (conceded == null ? 0 : conceded * rules.goalkeeperConceded + (conceded === 0 ? rules.cleanSheet : 0));
+}
+
+function assignEvent(players, weight, total, rng) {
+  let draw = rng() * total;
+  for (const item of players) {
+    draw -= weight(item);
+    if (draw < 0) return item;
+  }
+  return null;
+}
+
+function sharedMatchEvents(groups, appearances, rng) {
+  const shared = new Map();
+  for (const { fixture, prediction, entries } of groups) {
+    const [home, away] = prediction.sampleScore(rng);
+    for (const [teamId, goals, conceded, teamRate] of [
+      [fixture.homeId, home, away, prediction.homeRate], [fixture.awayId, away, home, prediction.awayRate]
+    ]) {
+      const active = entries.filter(entry => sameId(entry.player.teamId, teamId) && appearances.get(entry)?.exposure)
+        .map(entry => {
+          const projection = entry.analysis.projection;
+          const exposure = appearances.get(entry).exposure;
+          const result = { goals: 0, assists: 0, penalties: 0 };
+          if (['GK','DEF'].includes(entry.player.position)) {
+            let concededOnPitch = 0;
+            for (let goal = 0; goal < conceded; goal++) if (rng() < exposure) concededOnPitch++;
+            result.cleanSheet = concededOnPitch === 0;
+            if (entry.player.position === 'GK') result.conceded = concededOnPitch;
+          }
+          shared.set(entry, result);
+          return { entry, result, goals: projection.goalRate * exposure, assists: projection.assistRate * exposure,
+            penalties: (projection.extraRates.penaltyScored ?? 0) * exposure, taker: projection.penaltyTaker };
+        });
+      if (!active.length) continue;
+      const goalTotal = sum(active.map(item => item.goals + item.penalties));
+      const goalWeight = Math.max(teamRate, goalTotal);
+      const penaltyTotal = sum(active.map(item => item.penalties));
+      const penaltyWeight = item => item.penalties * (item.taker ? 1.75 : 1);
+      const weightedPenalties = sum(active.map(penaltyWeight));
+      for (let index = 0; index < goals; index += 1) {
+        const penalty = penaltyTotal > 0 && rng() < penaltyTotal / goalWeight;
+        const scorer = penalty ? assignEvent(active, penaltyWeight, weightedPenalties, rng)
+          : assignEvent(active, item => item.goals, goalWeight - penaltyTotal, rng);
+        if (scorer) scorer.result[penalty ? 'penalties' : 'goals']++;
+        if (penalty) continue;
+        const assists = active.filter(item => item !== scorer);
+        const providerRate = sum(assists.map(item => item.assists));
+        const creator = assignEvent(assists, item => item.assists, Math.max(teamRate, providerRate), rng);
+        if (creator) creator.result.assists++;
+      }
+    }
+  }
+  return shared;
+}
+
+function defenseBonus(used, rules) {
+  if (!rules.defenseModifier) return 0;
+  const defense = used.filter(item => item.position === 'DEF' && finite(item.vote)).map(item => item.vote).sort((a, b) => b - a);
+  const keeper = used.find(item => item.position === 'GK' && finite(item.vote));
+  if (defense.length < 4 || (rules.defenseIncludesKeeper && !keeper)) return 0;
+  const votes = rules.defenseIncludesKeeper ? [keeper.vote, ...defense.slice(0, 3)] : defense.slice(0, 4);
+  const mean = average(votes);
+  return mean >= 7 ? rules.defenseAt7 : mean >= 6.5 ? rules.defenseAt65 : mean >= 6 ? rules.defenseAt6 : 0;
 }
 
 function makeHistogram(values) {
@@ -548,7 +694,9 @@ function makeHistogram(values) {
 }
 
 export function simulateLineup(starters, options = {}) {
-  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples, leagueVotesByPlayer, asOf = Date.now() } = options;
+  const { dataset, round, formation, reserves = [], mode = dataset?.mode, seed = 'fantalab-2026-27', fantasySamples,
+    leagueVotesByPlayer, manualAvailability, penaltyTakers, fixtureScore, asOf = Date.now() } = options;
+  const scoring = sanitizeScoring(options.scoring);
   const iterations = clamp(Math.trunc(Number(options.iterations) || 5000), 1, 30000);
   const maxSubstitutions = clamp(Math.trunc(Number(options.maxSubstitutions ?? 3) || 0), 0, 11);
   const empty = { status: 'insufficient', mode, method: null, methods: {}, mean: null, p10: null, p50: null, p90: null, min: null, max: null, histogram: [], individual: [], excluded: [], coverage: 0, iterations: 0, seed, notes: [] };
@@ -570,7 +718,8 @@ export function simulateLineup(starters, options = {}) {
     const fantasySample = fantasySamples instanceof Map ? fantasySamples.get(record.id)
       : fantasySamples && Object.hasOwn(fantasySamples, record.id) ? fantasySamples[record.id] : null;
     const analyze = (method) => {
-      const result = analyzePlayer(record, { dataset, round, mode, fantasySample, leagueVotes: leagueVotesByPlayer?.get(record.id), asOf, method });
+      const result = analyzePlayer(record, { dataset, round, mode, fantasySample, leagueVotes: leagueVotesByPlayer?.get(record.id),
+        manualAvailability: manualAvailability?.get(record.id), penaltyTaker: penaltyTakers?.has(record.id), scoring, asOf, method });
       if (round != null && round !== '' && !result.fixture && result.notes[0] !== 'Giocatore assente dall’archivio selezionato.') {
         return { ...result, expectedPoints: null, notes: ['La squadra non ha una partita verificata per la giornata selezionata.'] };
       }
@@ -614,15 +763,31 @@ export function simulateLineup(starters, options = {}) {
   const coverage = lineup.length ? eligibleStarters.length / lineup.length : 0;
   if (!eligibleStarters.length) return { ...empty, coverage, excluded, notes: ['Nessun titolare con dati sufficienti per la simulazione.'] };
 
+  const eligible = [...eligibleStarters, ...eligibleReserves];
+  const grouped = new Map();
+  for (const entry of eligible) {
+    const { fixture, projection } = entry.analysis;
+    if (!fixtureScore || !fixture || projection.method !== 'events') continue;
+    if (!grouped.has(fixture.id)) grouped.set(fixture.id, { fixture, prediction: fixtureScore(fixture), entries: [] });
+    grouped.get(fixture.id).entries.push(entry);
+  }
+  const matchGroups = [...grouped.values()].filter(group => group.prediction);
   const rng = createRng(seed);
   const values = [];
   for (let trial = 0; trial < iterations; trial += 1) {
     let total = 0;
     let substitutions = 0;
     const missingPositions = Object.fromEntries(POSITIONS.map((position) => [position, 0]));
+    const appearances = new Map(eligible.map(entry => [entry, drawAppearance(entry.analysis.projection, rng)]));
+    const shared = sharedMatchEvents(matchGroups, appearances, rng);
+    const used = [];
+    const pointsFor = entry => {
+      const appearance = appearances.get(entry);
+      return appearance?.points ?? (appearance ? drawEventScore(entry.analysis.projection, appearance, rng, shared.get(entry)) : null);
+    };
 
     for (const entry of eligibleStarters) {
-      const score = drawScore(entry.analysis.projection, rng);
+      const score = pointsFor(entry);
       if (score == null) {
         if (POSITIONS.includes(entry.player.position)) missingPositions[entry.player.position] += 1;
         continue;
@@ -631,10 +796,11 @@ export function simulateLineup(starters, options = {}) {
       entry.points += score;
       entry.used += 1;
       entry.appearances += 1;
+      used.push({ position: entry.player.position, vote: appearances.get(entry).vote });
     }
 
     for (const entry of eligibleReserves) {
-      const score = drawScore(entry.analysis.projection, rng);
+      const score = pointsFor(entry);
       if (score == null) continue;
       entry.appearances += 1;
       const { position } = entry.player;
@@ -644,8 +810,9 @@ export function simulateLineup(starters, options = {}) {
       total += score;
       entry.points += score;
       entry.used += 1;
+      used.push({ position, vote: appearances.get(entry).vote });
     }
-    values.push(total);
+    values.push(total + defenseBonus(used, scoring));
   }
 
   values.sort((first, second) => first - second);
@@ -666,8 +833,9 @@ export function simulateLineup(starters, options = {}) {
   for (const row of individual) methods[row.method] = (methods[row.method] ?? 0) + 1;
   const localSource = eligibleStarters.find(entry => entry.analysis.projection.sample?.source)?.analysis.projection.sample.source;
   const notes = method === 'events' ? [
-    'Simulazione con eventi indipendenti tra giocatori. Gol, assist e gol subiti seguono distribuzioni di Poisson.',
-    'Il modello assegna un voto base di 6 per ogni presenza simulata.',
+    matchGroups.length ? `Punteggi condivisi per ${matchGroups.length} partite su ${grouped.size}. Gol e assist vengono assegnati fra i giocatori in campo e il resto della squadra.`
+      : 'Gol, assist e gol subiti stimati con eventi indipendenti per giocatore.',
+    'Il voto base oscilla intorno a 6. La deviazione standard proviene dai voti FantaTB già pubblicati per ruolo oppure dalla riserva di 0,45–0,50.',
   ] : method === 'league-history' ? [
     `La simulazione estrae un fantavoto dal CSV della lega${localSource ? ` (${localSource})` : ''}. Le righe esplicite senza voto contribuiscono alla probabilità di sostituzione.`,
   ] : method === 'league-average' ? [
@@ -686,6 +854,17 @@ export function simulateLineup(starters, options = {}) {
     }
     notes.push('Il modello simula i giocatori in modo indipendente.');
   }
+  if (method === 'events') {
+    const eventPlayers = eligible.filter(entry => entry.analysis.projection.method === 'events');
+    const ruleLabels = { penaltyScored: 'rigore segnato separato', penaltyMissed: 'rigore sbagliato', penaltySaved: 'rigore parato', ownGoal: 'autogol', redCard: 'espulsione' };
+    const missing = Object.entries(ruleLabels).filter(([key]) => scoring[key] !== 0 && eventPlayers.some(entry =>
+      entry.analysis.projection.extraRates[key] == null && (key !== 'penaltySaved' || entry.player.position === 'GK'))).map(([, label]) => label);
+    if (missing.length) notes.push(`Regole escluse per i giocatori senza dati · ${missing.join(', ')}.`);
+    if (eventPlayers.some(entry => entry.analysis.projection.penaltyTaker &&
+      (!matchGroups.some(group => group.entries.includes(entry)) || entry.analysis.projection.extraRates.penaltyScored == null))) {
+      notes.push('La segnalazione rigorista pesa solo con un tasso di rigori acquisito e un punteggio di squadra disponibile.');
+    }
+  } else if (options.scoring) notes.push('I fantavoti e le fantamedie importati incorporano già bonus e malus della fonte. Il regolamento della simulazione per eventi non viene applicato.');
   notes.push(`Sostituzioni nell’ordine della panchina e a parità di ruolo. Limite di ${maxSubstitutions} per simulazione.`);
   if (excluded.length) notes.push('I giocatori con dati insufficienti sono esclusi. Le riserve subentrano solo per le assenze simulate dei titolari con dati sufficienti.');
   return {

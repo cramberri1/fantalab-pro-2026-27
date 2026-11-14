@@ -26,6 +26,8 @@ In **Dati reali → Analisi → Fantavoti della lega**, scarica il modello CSV, 
 
 ## Dati e copertura
 
+In **La mia rosa** puoi trascinare i calciatori, copiare la formazione precedente, annullare l’ultima modifica e chiedere un undici suggerito. In **Simulazione** puoi confrontare due formazioni della stessa giornata, impostare il regolamento Classic e salvare la previsione da consultare in **Rendimento**.
+
 L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, calciatori, statistiche e indisponibilità con ID stabili e metadati di provenienza. La demo ha un archivio a sé.
 
 - Calendario di 380 partite. OpenFootball, Football Analytics e i referti dei club coprono tutti i 110 risultati finali fino alla 11ª giornata.
@@ -45,6 +47,8 @@ L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, cal
 Il workflow pianificato aggiorna le fonti aperte ogni giorno alle 04:37 UTC e pubblica il sito solo quando la preparazione riesce. Per aggiungere feed con licenza e credenziali, segui la [guida agli aggiornamenti e ai Secrets](docs/AGGIORNAMENTI.md).
 
 ## Verifica e ricostruzione
+
+GitHub Pages consente l’installazione da un browser compatibile. Dopo un primo caricamento online la PWA può riaprire l’ultimo archivio disponibile anche offline. Per lo smoke test facoltativo, esegui la build HTML e avvia `node tests/smoke.mjs [URL]` con Playwright disponibile. `FANTALAB_PLAYWRIGHT` può indicare il percorso del pacchetto e `FANTALAB_BROWSER` l’eseguibile del browser.
 
 ```sh
 python -m unittest discover -s tests -p 'test_*.py'

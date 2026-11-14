@@ -39,5 +39,7 @@ Le statistiche xG/xA per calciatore restano mancanti finché arriva un feed con 
 
 ## Interpretazione
 
+Gli export FantaTB delle giornate 6–11 hanno restituito HTTP 404 il 14 novembre 2026. Per aggiungere voti della propria lega si usa il CSV locale in **Analisi → Fantavoti della lega**, con un’etichetta della fonte. Le partite a voto, la media voto e la fantamedia del listone Excel restano statistiche di lega e vengono mostrate con il campione dichiarato. Le indisponibilità, le squalifiche e le diffide inserite manualmente restano nel browser e nel backup dell’utente. Il comunicato del Giudice Sportivo è consultabile dalla documentazione della Lega. [Archivio TransferBeat](https://transferbeat.com/fantacalcio/voti.html) · [Documentazione Lega Serie A](https://www.legaseriea.it/lega-serie-a/documentazione)
+
 - L’xG stima la probabilità di segnare a partire da un tiro. L’xA dipende dal modello. Wyscout attribuisce al passaggio l’xG del tiro generato, mentre Opta stima la probabilità che un passaggio completato diventi assist. Conservare il nome del modello e la fonte quando si mostra una serie statistica. [Definizione Wyscout](https://dataglossary.wyscout.com/xa/), [definizioni Opta](https://www.statsperform.com/opta-event-definitions/)
 - Uno zero registrato è un dato. Un valore assente resta sconosciuto. I risultati delle simulazioni e gli indici di schierabilità sono stime. La modalità demo usa dati di esempio.

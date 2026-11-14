@@ -265,7 +265,8 @@ def validate(snapshot):
     for player in players.values():
         if player['teamId'] not in teams or player['position'] not in ('GK', 'DEF', 'MID', 'FWD', None):
             raise DataError('Squadra o ruolo giocatore sconosciuto.')
-        validate_metrics(player, ('appearances', 'starts', 'minutes', 'goals', 'assists', 'xg', 'xa', 'npxg', 'shots', 'yellowCards'))
+        validate_metrics(player, ('appearances', 'starts', 'minutes', 'goals', 'assists', 'xg', 'xa', 'npxg', 'shots', 'yellowCards',
+                                  'redCards', 'penaltiesScored', 'penaltiesMissed', 'penaltiesSaved', 'ownGoals'))
         validate_ratings(player)
         seen = set()
         for row in player.get('history', []):

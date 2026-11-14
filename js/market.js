@@ -221,6 +221,19 @@ function linkRoster(roster, catalog, teams) {
   return { profiles, excludedKeys };
 }
 
+export function indexLeagueStatistics(listone, players, teams) {
+  const catalog = workbookCatalog(rowsOf(listone), [], teamLookup(teams));
+  const { profiles } = linkRoster(players, catalog, teams);
+  const matched = profiles.filter(profile => profile.resolution === 'matched' && !profile.offList);
+  const playersByWorkbook = groupBy(matched, profile => profile.playerKey);
+  return new Map(matched.filter(profile => playersByWorkbook.get(profile.playerKey).length === 1)
+    .map(profile => [profile.rosterId, {
+      gamesWithVote: profile.appearances,
+      averageRating: profile.averageRating,
+      fantasyAverage: profile.fantasyAverage
+    }]));
+}
+
 export function buildMarket({ listone, freeAgents, roster = [], dataset, round, analyze } = {}) {
   const listRows = rowsOf(listone);
   const freeRows = rowsOf(freeAgents);

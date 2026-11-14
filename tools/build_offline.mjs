@@ -75,9 +75,12 @@ function replaceRequired(value, pattern, replacement) {
   return value.replace(pattern, replacement);
 }
 
-const [html, css, icon, model, rosterImport, marketImport, market, calendar, matchModel, lineupDrag, app, real, demo, history] = await Promise.all([
+const [html, css, icon, model, rosterImport, marketImport, market, calendar, matchModel, lineupDrag, lineupContext, lineupComparison,
+  manualAvailability, fixtureDifficulty, lineupSuggestion, lineupPerformance, app, real, demo, history] = await Promise.all([
   read('index.html'), read('styles.css'), embedAsset('assets/mark.svg'), read('js/model.js'),
-  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/match-model.js'), read('js/lineup-drag.js'), read('js/app.js'),
+  read('js/roster-import.js'), read('js/market-import.js'), read('js/market.js'), read('js/calendar.js'), read('js/match-model.js'),
+  read('js/lineup-drag.js'), read('js/lineup-context.js'), read('js/lineup-comparison.js'), read('js/manual-availability.js'),
+  read('js/fixture-difficulty.js'), read('js/lineup-suggestion.js'), read('js/lineup-performance.js'), read('js/app.js'),
   read('data/serie-a-2026-27.json'), read('data/demo.json'),
   read('data/serie-a-2025-26.json').catch(error => { if (error.code === 'ENOENT') return null; throw error; })
 ]);
@@ -89,6 +92,12 @@ const modules = [
   { path: 'market.js', namespace: 'FantaLabMarket', source: market },
   { path: 'calendar.js', namespace: 'FantaLabCalendar', source: calendar },
   { path: 'lineup-drag.js', namespace: 'FantaLabLineupDrag', source: lineupDrag },
+  { path: 'lineup-context.js', namespace: 'FantaLabLineupContext', source: lineupContext },
+  { path: 'lineup-comparison.js', namespace: 'FantaLabLineupComparison', source: lineupComparison },
+  { path: 'manual-availability.js', namespace: 'FantaLabManualAvailability', source: manualAvailability },
+  { path: 'fixture-difficulty.js', namespace: 'FantaLabFixtureDifficulty', source: fixtureDifficulty },
+  { path: 'lineup-suggestion.js', namespace: 'FantaLabLineupSuggestion', source: lineupSuggestion },
+  { path: 'lineup-performance.js', namespace: 'FantaLabLineupPerformance', source: lineupPerformance },
   { path: 'match-model.js', namespace: 'FantaLabMatchModel',
     source: replaceRequired(matchModel, /^import \{ fixtureCalendarDay \} from '\.\/calendar\.js';/m,
       'const { fixtureCalendarDay } = FantaLabCalendar;') }
@@ -97,7 +106,8 @@ const scripts = [inlineData(real, 'real'), inlineData(demo, 'demo'),
   ...(history ? [inlineData(history, 'real', '2025/26', 'history')] : []),
   `<script type="module">\n${inlineModules(app, modules)}\n</script>`];
 const withIcon = replaceRequired(html, /(<link rel="icon" href=")assets\/mark\.svg(")/, (_, start, end) => start + icon + end);
-const withStyles = replaceRequired(withIcon, /<link rel="stylesheet" href="styles\.css">/, () => `<style>\n${styles}\n</style>`);
+const offlineHtml = withIcon.replace(/^\s*<link rel="(?:manifest|apple-touch-icon)"[^>]+>$/gm, '');
+const withStyles = replaceRequired(offlineHtml, /<link rel="stylesheet" href="styles\.css">/, () => `<style>\n${styles}\n</style>`);
 const output = replaceRequired(withStyles, /<script type="module" src="js\/app\.js"><\/script>/, () => scripts.join('\n  '));
 const destination = resolve(process.argv[2] ?? resolve(project, '..', 'FantaLab-Pro.html'));
 const temporary = `${destination}.${randomUUID()}.tmp`;

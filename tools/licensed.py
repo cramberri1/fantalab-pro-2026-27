@@ -15,6 +15,7 @@ API_DOCS = 'https://www.api-football.com/documentation-v3'
 API_TERMS = 'https://www.api-football.com/terms'
 API_LEAGUE = 135
 PLAYER_FIELDS = ('appearances', 'starts', 'minutes', 'goals', 'assists', 'shots', 'yellowCards')
+EXTRA_PLAYER_FIELDS = ('redCards', 'penaltiesScored', 'penaltiesMissed', 'penaltiesSaved', 'ownGoals')
 METRICS = ('xg', 'xa', 'npxg')
 
 
@@ -234,10 +235,10 @@ def metrics_input():
 def merge_player_overlay(players, fixtures, rows):
     for row in row_index(rows, 'metriche giocatori').values():
         player = players[row['id']]
-        for field in (*PLAYER_FIELDS, *METRICS):
+        for field in (*PLAYER_FIELDS, *EXTRA_PLAYER_FIELDS, *METRICS):
             if field in row:
                 player[field] = row[field]
-        if any(field in row for field in (*PLAYER_FIELDS, *METRICS)):
+        if any(field in row for field in (*PLAYER_FIELDS, *EXTRA_PLAYER_FIELDS, *METRICS)):
             player['overlayStatsSourceId'] = 'metrics-overlay'
         if 'history' in row:
             player['history'] = [{

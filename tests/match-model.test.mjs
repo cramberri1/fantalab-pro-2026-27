@@ -39,7 +39,9 @@ test('requires enough prior results to score a fixture with or without an archiv
   assert.equal(result.priorMatches, 0);
   assert.equal(result.currentMatches, 12);
   assert.deepEqual(backtestMatches([completed]), {
-    matches: 0, excluded: 1, model: { brier: null, logLoss: null }, baseline: { brier: null, logLoss: null }
+    matches: 0, excluded: 1, dixonColesMatches: 0, selectedModel: 'poisson',
+    model: { brier: null, logLoss: null }, baseline: { brier: null, logLoss: null },
+    dixonColes: { brier: null, logLoss: null }
   });
 });
 
@@ -64,4 +66,53 @@ test('evaluates the real snapshot against the same-date league baseline', () => 
   assert.ok(result.model.logLoss >= 0);
   assert.ok(result.baseline.brier >= 0 && result.baseline.brier <= 2);
   assert.ok(result.baseline.logLoss >= 0);
+  assert.ok(result.dixonColesMatches > 0);
+  assert.ok(result.dixonColes.brier >= 0 && result.dixonColes.brier <= 2);
+  assert.ok(result.dixonColes.logLoss >= 0);
+});
+
+const isoDay = (start, index) => new Date(Date.parse(start) + index * 86_400_000).toISOString().slice(0, 10);
+const draw = { homeId: 'alpha', awayId: 'beta', status: 'played', homeGoals: 0, awayGoals: 0 };
+const drawPrior = Array.from({ length: 68 }, (_, index) => ({ ...draw, date: isoDay('2026-01-01', index) }));
+const drawCurrent = Array.from({ length: 50 }, (_, index) => ({ ...draw, date: isoDay('2026-07-01', index) }));
+const drawTarget = { ...target, date: '2026-08-20' };
+
+test('requires enough prior evaluation and both metric improvements to choose Dixon–Coles', () => {
+  const report = backtestMatches(drawCurrent, drawPrior);
+  assert.equal(report.dixonColesMatches, 50);
+  assert.ok(report.dixonColes.brier < report.model.brier);
+  assert.ok(report.dixonColes.logLoss < report.model.logLoss);
+  assert.equal(report.selectedModel, 'dixon-coles');
+  const beforeEvidence = predictMatch(drawTarget, drawCurrent.slice(0, -1), drawPrior);
+  assert.equal(beforeEvidence.model, 'poisson');
+  assert.equal(beforeEvidence.rho, null);
+  const afterEvidence = predictMatch(drawTarget, drawCurrent, drawPrior);
+  assert.equal(afterEvidence.model, 'dixon-coles');
+  assert.equal(afterEvidence.selectionMatches, 50);
+  assert.ok(afterEvidence.rho < 0);
+  assert.ok(afterEvidence.probabilities[1] > beforeEvidence.probabilities[1]);
+  assert.ok(afterEvidence.probabilities.every(value => value > 0));
+  assert.ok(Math.abs(afterEvidence.probabilities.reduce((sum, value) => sum + value, 0) - 1) < 1e-12);
+});
+
+test('fit and model selection ignore later matches and all results on the Italian kickoff day', () => {
+  const prediction = predictMatch(drawTarget, drawCurrent, drawPrior);
+  const extras = [
+    { ...draw, date: '2026-08-20', homeGoals: 4 },
+    { ...draw, kickoff: '2026-08-19T22:30:00Z', homeGoals: 6 },
+    { ...draw, date: '2026-08-21', awayGoals: 8 }
+  ];
+  assert.deepEqual(predictMatch(drawTarget, [...extras, ...drawCurrent], drawPrior), prediction);
+  assert.deepEqual(predictMatch(drawTarget, drawCurrent, [...drawPrior, ...extras]), prediction);
+});
+
+test('keeps the existing Poisson prediction when the calibrated correction performs worse', () => {
+  const decisive = Array.from({ length: 50 }, () => ({ ...draw, date: '2026-08-19', homeGoals: 2 }));
+  const report = backtestMatches(decisive, drawPrior);
+  assert.equal(report.dixonColesMatches, 50);
+  assert.ok(report.dixonColes.logLoss > report.model.logLoss);
+  assert.equal(report.selectedModel, 'poisson');
+  const result = predictMatch(drawTarget, decisive, drawPrior);
+  assert.equal(result.model, 'poisson');
+  assert.equal(result.rho, null);
 });

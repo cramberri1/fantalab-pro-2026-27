@@ -1,14 +1,20 @@
-import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, placeLineupPlayer } from './model.js';
+import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, getAvailability, placeLineupPlayer, sanitizeScoring } from './model.js';
 import { decodeRosterCsv, makeRosterCsvId, readRosterCsv, readVotesCsv } from './roster-import.js';
 import { readMarketWorkbook } from './market-import.js';
-import { buildMarket, rankMarketReplacements, compareMarketTrade } from './market.js';
+import { buildMarket, rankMarketReplacements, compareMarketTrade, indexLeagueStatistics } from './market.js';
 import { fixtureCalendarDay, getRoundWindow, isPendingFixture } from './calendar.js';
-import { predictMatch, backtestMatches } from './match-model.js';
+import { predictMatch, backtestMatches, matchScoreSampler, predictMatchRates } from './match-model.js';
 import { wireLineupDrag } from './lineup-drag.js';
+import { buildLineupContext } from './lineup-context.js';
+import { compareLineups, renderLineupComparison } from './lineup-comparison.js';
+import { manualAvailabilityRecord, sanitizeManualAvailability, renderManualAvailability, lineupManualLabel } from './manual-availability.js';
+import { buildFixtureDifficulty, renderFixtureDifficulty } from './fixture-difficulty.js';
+import { suggestLineup } from './lineup-suggestion.js';
+import { evaluateLineupPerformance } from './lineup-performance.js';
 
 const PAGES = {
   panoramica: 'Panoramica', match: 'Match Center', giocatori: 'Calciatori', analisi: 'Analisi',
-  rosa: 'La mia rosa', mercato: 'Mercato', simulazione: 'Simulazione', fonti: 'Fonti e metodo'
+  rosa: 'La mia rosa', mercato: 'Mercato', simulazione: 'Simulazione', rendimento: 'Rendimento', fonti: 'Fonti e metodo'
 };
 const ROLES = { GK: 'Portiere', DEF: 'Difensore', MID: 'Centrocampista', FWD: 'Attaccante' };
 const SHORT = { GK: 'P', DEF: 'D', MID: 'C', FWD: 'A' };
@@ -47,7 +53,7 @@ const filters = { search: '', position: '', team: '', sort: 'name', page: 1 };
 const marketFilters = { tab: 'riparazione', search: '', role: '', outgoing: '', incoming: '', budget: '', credits: '', page: 1 };
 const selectedComparison = { real: [], demo: [] };
 const selectedRounds = { real: null, demo: null };
-const views = { panoramica, match, giocatori, analisi, rosa, mercato, simulazione, fonti };
+const views = { panoramica, match, giocatori, analisi, rosa, mercato, simulazione, rendimento, fonti };
 let dataset;
 let mode = 'real';
 let round = 1;
@@ -61,6 +67,8 @@ let lastFocus;
 let storage = readStorage();
 let marketImports = Object.fromEntries(Object.keys(MARKET_UPLOADS).map(kind => [kind, readMarketSource(kind)]));
 let marketCache;
+let leagueStatsCache;
+let leagueSamplesCache;
 let marketNotice = '';
 let votesReport;
 let votesImport = readVotesImport();
@@ -71,6 +79,12 @@ let historicalError = false;
 let historicalRequest;
 let matchBacktest;
 let lineupSelection;
+const lineupUndo = { real: new Map(), demo: new Map() };
+let lineupCopyPreview = false;
+let lineupComparisonResult;
+let lineupSuggestion;
+let difficultyCache;
+let showDifficulty = false;
 let analysisTeamId;
 const marketReadVersion = { listone: 0, svincolati: 0 };
 
@@ -115,6 +129,10 @@ function sanitizeBackup(raw) {
     const saved = raw?.[m];
     if (!saved || typeof saved !== 'object') continue;
     clean[m].roster = ids(saved.roster);
+    clean[m].availability = sanitizeManualAvailability(saved.availability);
+    if (saved.scoring && typeof saved.scoring === 'object') clean[m].scoring = sanitizeScoring(saved.scoring);
+    clean[m].penaltyTakers = ids(saved.penaltyTakers);
+    clean[m].forecasts = sanitizeForecasts(saved.forecasts);
     if (m === 'real') {
       clean[m].rosterLocals = {};
       for (const id of clean[m].roster) {
@@ -124,16 +142,18 @@ function sanitizeBackup(raw) {
         clean[m].rosterLocals[id] = { id, name, teamId, position };
       }
     }
-    clean[m].lineups = {};
-    for (const [key, value] of Object.entries(saved.lineups ?? {})) {
-      if (!/^(?:[1-9]|[12]\d|3[0-8])$/.test(key) || !value || typeof value !== 'object') continue;
-      const starters = ids(value.starters).slice(0, 11);
-      clean[m].lineups[key] = {
-        formation: FORMATION_OPTIONS.includes(value.formation) ? value.formation : '3-4-3',
-        starters,
-        reserves: ids(value.reserves).filter(id => !starters.includes(id)),
-        maxSubstitutions: Number.isInteger(value.maxSubstitutions) ? Math.max(0, Math.min(5, value.maxSubstitutions)) : 3
-      };
+    for (const key of ['lineups','references']) {
+      clean[m][key] = {};
+      for (const [day, value] of Object.entries(saved[key] ?? {})) {
+        if (!/^(?:[1-9]|[12]\d|3[0-8])$/.test(day) || !value || typeof value !== 'object') continue;
+        const starters = ids(value.starters).slice(0, 11);
+        clean[m][key][day] = {
+          formation: FORMATION_OPTIONS.includes(value.formation) ? value.formation : '3-4-3',
+          starters,
+          reserves: ids(value.reserves).filter(id => !starters.includes(id)),
+          maxSubstitutions: Number.isInteger(value.maxSubstitutions) ? Math.max(0, Math.min(5, value.maxSubstitutions)) : 3
+        };
+      }
     }
   }
   return clean;
@@ -152,12 +172,54 @@ function modeState() {
   saved.roster ??= [];
   saved.rosterLocals ??= {};
   saved.lineups ??= {};
+  saved.references ??= {};
+  saved.availability ??= {};
+  saved.penaltyTakers ??= [];
+  saved.forecasts ??= {};
   return saved;
 }
 function lineup() {
   const state = modeState();
   state.lineups[round] ??= { formation: '3-4-3', starters: [], reserves: [], maxSubstitutions: 3 };
   return state.lineups[round];
+}
+function lineupSnapshot(record) {
+  return { ...record, starters: [...record.starters], reserves: [...record.reserves] };
+}
+function invalidateLineupResults() {
+  simulationResult = undefined;
+  lineupComparisonResult = undefined;
+  lineupSuggestion = undefined;
+}
+function sanitizeForecasts(value) {
+  const forecasts = {};
+  for (const [day, raw] of Object.entries(value && typeof value === 'object' ? value : {})) {
+    if (!/^(?:[1-9]|[12]\d|3[0-8])$/.test(day) || raw?.round !== Number(day) || raw.season !== '2026/27' ||
+        !Number.isFinite(Date.parse(raw.asOf)) || !Number.isFinite(raw.expectedPoints) || !Array.isArray(raw.starters) ||
+        !Array.isArray(raw.reserves)) continue;
+    const players = rows => rows.filter(p => p && typeof p.id === 'string' && p.id.length <= 120 &&
+      typeof p.name === 'string' && Object.hasOwn(ROLES,p.position)).map(p => ({
+      id:p.id, name:p.name.slice(0,120), position:p.position, expectedPoints:Number.isFinite(p.expectedPoints) ? p.expectedPoints : null
+    }));
+    const starters = players(raw.starters);
+    if (starters.length !== 11 || new Set(starters.map(p => p.id)).size !== 11) continue;
+    const ids = new Set(starters.map(p => p.id));
+    const reserves = players(raw.reserves.slice(0,1000)).filter(p => !ids.has(p.id) && ids.add(p.id));
+    forecasts[day] = { round:raw.round, season:raw.season, asOf:raw.asOf, expectedPoints:raw.expectedPoints,
+      starters, reserves, coverage:Number.isFinite(raw.coverage) ? Math.max(0,Math.min(1,raw.coverage)) : null,
+      complete:raw.complete === true, method:typeof raw.method === 'string' ? raw.method.slice(0,50) : null,
+      source:typeof raw.source === 'string' ? raw.source.slice(0,120) : null,
+      sourceId:typeof raw.sourceId === 'string' ? raw.sourceId.slice(0,120) : null,
+      maxSubstitutions:Number.isInteger(raw.maxSubstitutions) ? Math.max(0,Math.min(5,raw.maxSubstitutions)) : 3 };
+  }
+  return forecasts;
+}
+function manualAvailabilityFor(id) {
+  const reports = modeState().availability[round];
+  return reports && Object.hasOwn(reports, id) ? reports[id] : undefined;
+}
+function roundAvailability() {
+  return new Map(Object.entries(modeState().availability[round] ?? {}));
 }
 function currentPage() {
   const name = location.hash.slice(1);
@@ -194,19 +256,21 @@ function notify(message) {
   toastTimer = setTimeout(() => { toast.hidden = true; }, 4800);
 }
 function setModeNotice() {
-  $('#mode-notice').innerHTML = mode === 'demo'
+  $('#mode-notice').innerHTML = (mode === 'demo'
     ? '<div class="notice"><strong>Modalità demo</strong> Squadre, calciatori, risultati e statistiche sono inventati. Le tue formazioni demo sono salvate a parte.</div>'
-    : '';
+    : '') + (dataset.offline ? `<div class="notice"><strong>Archivio offline</strong> Dati salvati ${dataset.updatedAt ? `del ${html(date(dataset.updatedAt))}` : 'nel browser'}.</div>` : '');
 }
 async function loadDataset(nextMode) {
   if (cache.has(nextMode)) return cache.get(nextMode);
   const embedded = document.getElementById(`data-${nextMode}`);
   const path = nextMode === 'real' ? './data/serie-a-2026-27.json' : './data/demo.json';
   let raw;
+  let offline = false;
   if (embedded) raw = JSON.parse(embedded.textContent);
   else {
     const response = await fetch(path, { cache: 'no-cache' });
     if (!response.ok) throw new Error('Dati non raggiungibili.');
+    offline = response.headers.get('X-Fantalab-Offline') === '1';
     raw = await response.json();
   }
   if (raw.mode !== nextMode || raw.season !== '2026/27' || raw.schemaVersion !== 1) throw new Error('Formato dati incompatibile.');
@@ -215,7 +279,7 @@ async function loadDataset(nextMode) {
   }
   if (!raw.coverage || typeof raw.coverage !== 'object') throw new Error('Copertura sconosciuta.');
   const loaded = {
-    ...raw,
+    ...raw, offline,
     playerMap: new Map(raw.players.map(player => [player.id, player])),
     teamMap: new Map(raw.teams.map(team => [team.id, team]))
   };
@@ -233,11 +297,12 @@ async function switchMode(nextMode) {
     dataset = loaded;
     round = rounds().includes(selectedRounds[mode]) ? selectedRounds[mode] : getRoundWindow(dataset).defaultRound;
     selectedFixtureId = undefined;
-    simulationResult = undefined;
+    invalidateLineupResults();
+    lineupCopyPreview = false;
     Object.assign(filters, { search: '', position: '', team: '', sort: 'name', page: 1 });
     setModeNotice();
     render();
-    if (['analisi','match'].includes(page) && mode === 'real') void loadHistoricalArchive();
+    if (['analisi','match','simulazione'].includes(page) && mode === 'real') void loadHistoricalArchive();
   } catch (error) {
     if (request !== loadVersion) return;
     const message = 'Impossibile caricare questo insieme di dati. Riprova o apri la copia HTML autonoma.';
@@ -262,13 +327,18 @@ function render() {
     else link.removeAttribute('aria-current');
   }
   pageView.innerHTML = views[page]();
+  if (page === 'match' && showDifficulty) {
+    showDifficulty = false;
+    requestAnimationFrame(() => $('#fixture-difficulty')?.scrollIntoView({ block:'start' }));
+  }
 }
 function goRound(next) {
   if (!rounds().includes(next) || next === round) return;
   round = next;
   selectedRounds[mode] = round;
   selectedFixtureId = undefined;
-  simulationResult = undefined;
+  invalidateLineupResults();
+  lineupCopyPreview = false;
   render();
 }
 function heading(title, description, actions = '') {
@@ -406,7 +476,8 @@ function matchCard(fixture) {
     ${odds ? `<div class="duel"><h3>Stima 1X2</h3><div class="probability" aria-hidden="true">${odds.map(value => `<span style="width:${value * 100}%"></span>`).join('')}</div>
       <div class="legend"><span>Casa ${percent(odds[0])}</span><span>Pareggio ${percent(odds[1])}</span><span>Trasferta ${percent(odds[2])}</span></div>
       <p>Gol attesi dal modello · casa ${number(prediction.homeRate,2)} · trasferta ${number(prediction.awayRate,2)}.</p>
-      <p>Campione di campionato · ${number(prediction.currentMatches)} risultati della stagione${prediction.priorMatches ? ` · ${number(prediction.priorMatches)} risultati 2025/26` : ''}.</p>
+      <p>${prediction.model === 'dixon-coles' ? 'Poisson con correzione Dixon–Coles' : 'Poisson per squadra'} · fattore campo ${number(prediction.homeAdvantage, 2)}.
+      Campione · ${number(prediction.currentMatches)} risultati della stagione${prediction.priorMatches ? ` · ${number(prediction.priorMatches)} risultati 2025/26` : ''}.</p>
       ${mode === 'real' ? '<a class="text-link" href="#analisi">Verifica retrospettiva del modello</a>' : ''}</div>`
       : scheduled ? empty('Risultati precedenti insufficienti per stimare le probabilità 1X2.') : ''}
     <div class="duel"><h3>Indisponibilità segnalate</h3>${absences.length ? `<ul>${absences.map(a => `<li>${html(getPlayer(a.playerId)?.name ?? a.playerId)} · ${html(statusLabels[a.status] ?? 'Stato mancante')}${a.reason ? ` · ${html(a.reason)}` : ''}</li>`).join('')}</ul>`
@@ -432,13 +503,31 @@ function match() {
       <section class="panel"><div class="panel-head"><div><h2>Giornata ${round}</h2><p>Orari italiani quando disponibili</p></div><div class="actions"><button data-round="${allRounds[index - 1] ?? ''}" aria-label="Giornata precedente" ${index <= 0 ? 'disabled' : ''}>←</button>
         <button data-round="${allRounds[index + 1] ?? ''}" aria-label="Giornata successiva" ${index === allRounds.length - 1 ? 'disabled' : ''}>→</button></div></div>${fixtureList(fixtures, current?.id)}</section>
       <section class="panel" id="match-detail" aria-label="Dettaglio incontro">${matchCard(current)}</section>
-    </div>`;
+    </div><div id="fixture-difficulty">${renderFixtureDifficulty(difficultyGrid(), { html, number })}</div>`;
 }
-function playerAnalysis(player) {
+function difficultyGrid() {
+  const asOf = Date.now();
+  const day = fixtureCalendarDay({ kickoff: new Date(asOf).toISOString() });
+  if (difficultyCache?.dataset === dataset && difficultyCache.day === day && difficultyCache.archive === historicalArchive) return difficultyCache.grid;
+  const next = getRoundWindow(dataset).next;
+  const grid = buildFixtureDifficulty({ teams:dataset.teams, fixtures:dataset.fixtures,
+    priorFixtures:mode === 'real' ? historicalArchive?.fixtures : [],
+    rounds:next == null ? [] : rounds().filter(item => item >= next), asOf,
+    predict:predictMatchRates, calendarDay:fixtureCalendarDay });
+  difficultyCache = { dataset, day, archive:historicalArchive, grid };
+  return grid;
+}
+function teamDifficulty(teamId) {
+  const grid = difficultyGrid();
+  return { ...grid, rows:grid.rows.filter(row => row.team.id === teamId) };
+}
+function playerAnalysis(player, method) {
   return analyzePlayer(player, {
     dataset, fixture: getPlayerFixture(player, dataset.fixtures, round), round, mode,
-    fantasySample: mode === 'real' && modeState().roster.includes(player.id) ? leagueFantasySamples().get(player.id) : undefined,
-    leagueVotes: mode === 'real' ? votesByPlayer.get(player.id) : undefined
+    fantasySample: leagueFantasySamples().get(player.id),
+    leagueVotes: mode === 'real' ? votesByPlayer.get(player.id) : undefined,
+    manualAvailability: manualAvailabilityFor(player.id), method, scoring: modeState().scoring,
+    penaltyTaker: modeState().penaltyTakers.includes(player.id)
   });
 }
 function playerList() {
@@ -469,12 +558,18 @@ function playerList() {
 function comparison() {
   const candidates = groupPlayers(selectedComparison[mode]);
   if (!candidates.length) return '';
-  if (candidates.length === 1) return `<section class="panel stacked"><h2>Confronto</h2><p>Hai selezionato ${html(candidates[0].name)}. Seleziona un secondo calciatore.</p></section>`;
+  if (candidates.length === 1) return `<section class="panel stacked"><h2>Confronto</h2><p>Hai selezionato ${html(candidates[0].name)}. Puoi confrontare fino a tre calciatori.</p></section>`;
+  const estimates = new Map(candidates.map(player => [player.id, playerAnalysis(player)]));
+  const context = playerContexts(candidates);
   const metrics = {
     'Presenze': p => number(p.appearances), 'Minuti': p => number(p.minutes), 'Gol': p => number(p.goals),
     'Assist': p => number(p.assists), 'xG/90': p => number(per90(p.xg, p.minutes), 2),
-    'xA/90': p => number(per90(p.xa, p.minutes), 2), 'Indice': p => number(playerAnalysis(p).index),
-    'Fantapunti attesi': p => number(playerAnalysis(p).expectedPoints, 2)
+    'xA/90': p => number(per90(p.xa, p.minutes), 2), 'Indice': p => number(estimates.get(p.id).index),
+    'Fantapunti attesi': p => number(estimates.get(p.id).expectedPoints, 2),
+    'Metodo della stima': p => html(projectionLabel(estimates.get(p.id).projection?.method)),
+    'Fantamedia Excel': p => { const stats = leagueStats().get(p.id); return stats?.fantasyAverage == null ? '—'
+      : `${number(stats.fantasyAverage, 2)} · ${number(stats.gamesWithVote)} voti`; },
+    'Avversario della giornata': p => html(context.get(p.id)?.fixtureLabel ?? '—')
   };
   return `<section class="panel stacked"><div class="panel-head"><h2>Confronto</h2><button data-clear-comparison>Deseleziona tutti</button></div>
     <div class="table-wrap"><table><thead><tr><th>Statistica</th>${candidates.map(p => `<th class="numeric">${html(p.name)}</th>`).join('')}</tr></thead><tbody>
@@ -531,6 +626,7 @@ function showPlayer(id) {
   const a = playerAnalysis(p);
   const games = p.history ?? [];
   const votes = p.ratings ?? [];
+  const excel = leagueStats().get(id);
   const localVotes = mode === 'real' ? votesByPlayer.get(p.id) : undefined;
   const ratingValues = votes.map(row => row.rating).filter(Number.isFinite);
   const fantasyValues = votes.map(row => row.fantasyRating).filter(Number.isFinite);
@@ -550,16 +646,23 @@ function showPlayer(id) {
       ${stat('xG', number(p.xg, 2))}${stat('xA', number(p.xa, 2))}${stat('xG / 90', number(per90(p.xg, p.minutes), 2))}${stat('xA / 90', number(per90(p.xa, p.minutes), 2))}
       ${stat('Tiri', number(p.shots))}${stat('npxG', number(p.npxg, 2))}${stat('Ammonizioni', number(p.yellowCards))}${stat('Titolarità', number(p.starts))}
     </div>
+    ${excel ? `<section class="dialog-section"><h3>Statistiche del listone Excel</h3>
+      <p>Fonte · Excel della lega${marketImports.listone?.asOfRound ? ` · fino alla G${marketImports.listone.asOfRound}` : ' · giornata del campione da confermare in Mercato'}</p>
+      <div class="detail-grid">${stat('Partite a voto', number(excel.gamesWithVote))}${stat('Media voto', number(excel.averageRating, 2))}${stat('Fantamedia', number(excel.fantasyAverage, 2))}</div></section>` : ''}
     <div class="actions"><button data-add="${html(p.id)}" ${added ? 'disabled' : ''}>${added ? 'Nella tua rosa' : 'Aggiungi alla rosa'}</button></div>
     <section class="dialog-section"><h3>Schierabilità · Giornata ${round}</h3>
-      <p class="muted">${opponent ? `Avversaria · ${html(opponent.shortName)} · ` : ''}Disponibilità ${html(availabilityLabels[availability] ?? 'Mancante')}${a.availability?.reason ? ` · ${html(a.availability.reason)}` : ''}</p>
+      <p class="muted">${opponent ? `Avversaria · ${html(opponent.shortName)} · ` : ''}Disponibilità ${html(availabilityLabels[availability] ?? 'Mancante')}${a.availability?.source === 'manual' ? ' · inserita manualmente' : ''}${a.availability?.reason ? ` · ${html(a.availability.reason)}` : ''}</p>
       <div class="detail-grid">${stat('Indice / 100', number(a.index))}${stat('Copertura', percent(a.coverage))}
       ${stat(Number.isFinite(projected?.voteProbability) ? 'Prob. di voto' : 'Prob. di giocare', percent(projected?.voteProbability ?? projected?.appearanceProbability))}
       ${stat('Fantapunti attesi', number(a.expectedPoints, 2))}</div>
       ${projected?.method ? status(projectionLabel(projected.method), 'partial') : ''}
+      ${a.indexMethod === 'league-average' ? '<p class="muted">Indice basato sul campione di voti Excel.</p>' : ''}
       ${components.map(c => `<div class="duel"><strong>${html(c.label)} · ${number(c.value)}/100</strong><div class="meter" aria-hidden="true"><span style="width:${Math.min(100, Math.max(0, c.value))}%"></span></div><p>Peso effettivo ${number(c.effectiveWeight)}% · contributo ${number(c.contribution, 1)} punti. ${html(c.detail)}</p></div>`).join('')}
       ${a.notes.length ? `<ul class="muted">${a.notes.map(note => `<li>${html(note)}</li>`).join('')}</ul>` : ''}
     </section>
+    ${renderManualAvailability({ player: p, round, record: manualAvailabilityFor(p.id), html })}
+    <label class="field-label"><span><input type="checkbox" data-penalty-taker="${html(p.id)}" ${modeState().penaltyTakers.includes(p.id) ? 'checked' : ''}> Rigorista</span></label>
+    ${renderFixtureDifficulty(teamDifficulty(p.teamId), { html, number, compact: true })}
     ${games.length ? `<section class="dialog-section"><h3>xG e xA per giornata</h3>${historyChart(games, ['xg','xa'], ['xG','xA'], 1, 'Andamento xG e xA')}</section>` : ''}
     ${votes.length ? `<section class="dialog-section"><h3>Voto e fantavoto FantaTB</h3>
       <div class="detail-grid">${stat('Voti acquisiti',number(ratingValues.length))}${stat('Media voto acquisita',number(average(ratingValues),2))}
@@ -591,10 +694,12 @@ function preset() {
   const prior = state.lineups[demo.round];
   if (!prior?.starters.length && !prior?.reserves.length) {
     state.lineups[demo.round] = { formation: demo.formation, starters: [...demo.starters], reserves: [...demo.reserves], maxSubstitutions: 3 };
+    lineupUndo.demo.delete(demo.round);
     notify('Rosa demo e formazione di esempio caricate.');
   } else notify('I giocatori demo sono in rosa. La formazione già salvata è stata conservata.');
   round = selectedRounds.demo = demo.round;
-  simulationResult = undefined;
+  invalidateLineupResults();
+  lineupCopyPreview = false;
   save();
   render();
 }
@@ -609,11 +714,12 @@ function removePlayer(id) {
   const state = modeState();
   state.roster = state.roster.filter(value => value !== id);
   delete state.rosterLocals[id];
-  for (const record of Object.values(state.lineups)) {
+  for (const record of [...Object.values(state.lineups), ...Object.values(state.references), ...lineupUndo[mode].values()]) {
     record.starters = record.starters.filter(value => value !== id);
     record.reserves = record.reserves.filter(value => value !== id);
   }
-  simulationResult = undefined;
+  invalidateLineupResults();
+  lineupCopyPreview = false;
   save();
   render();
   notify('Calciatore rimosso dalla rosa e dalle formazioni salvate.');
@@ -628,6 +734,54 @@ function renderLineupChange(focus) {
   if (rosterList) rosterList.scrollTop = scrollTop;
   if (focus) focus()?.focus({ preventScroll: true });
 }
+function changeLineup(next, focus) {
+  const state = modeState();
+  lineupUndo[mode].set(round, lineupSnapshot(lineup()));
+  state.lineups[round] = lineupSnapshot(next);
+  lineupCopyPreview = false;
+  invalidateLineupResults();
+  save();
+  renderLineupChange(focus);
+}
+function previousLineup() {
+  const record = modeState().lineups[round - 1];
+  if (!record) return null;
+  const roster = lineupRoster();
+  const starters = record.starters.filter(id => roster.has(id));
+  const reserves = record.reserves.filter(id => roster.has(id));
+  if (!starters.length && !reserves.length) return null;
+  return {
+    record: { ...record, starters, reserves },
+    missing: record.starters.length + record.reserves.length - starters.length - reserves.length
+  };
+}
+function lineupHasChanges(record) {
+  return record.starters.length || record.reserves.length || record.formation !== '3-4-3' || record.maxSubstitutions !== 3;
+}
+function copyPreviousLineup(confirmCopy) {
+  const previous = previousLineup();
+  if (!previous) return;
+  if (!confirmCopy && lineupHasChanges(lineup())) {
+    lineupCopyPreview = true;
+    renderLineupChange(() => $('[data-lineup-copy-confirm]'));
+    return;
+  }
+  if (confirmCopy && !lineupCopyPreview) return;
+  changeLineup(previous.record, () => $('[data-lineup-undo]'));
+  const skipped = previous.missing ? ` ${previous.missing} calciatori non sono più disponibili nella rosa.` : '';
+  notify(`Formazione copiata dalla giornata ${round - 1}.${skipped}`);
+}
+function undoLineupChange() {
+  const previous = lineupUndo[mode].get(round);
+  if (!previous) return;
+  modeState().lineups[round] = previous;
+  lineupUndo[mode].delete(round);
+  lineupCopyPreview = false;
+  invalidateLineupResults();
+  save();
+  renderLineupChange(() => $('[data-lineup-copy]:not(:disabled)') ?? $('#formation') ?? $('#simulation-form button'));
+  notify('Ultima modifica alla formazione annullata.');
+}
 function applyLineupPlacement(id, target, focus) {
   const record = lineup();
   const roster = lineupRoster();
@@ -638,11 +792,7 @@ function applyLineupPlacement(id, target, focus) {
     return;
   }
   if (!result.starters) return;
-  record.starters = result.starters;
-  record.reserves = result.reserves;
-  simulationResult = undefined;
-  save();
-  renderLineupChange(focus);
+  changeLineup({ ...record, starters: result.starters, reserves: result.reserves }, focus);
   const name = roster.get(id).name;
   if (result.replaced) notify(`${name} e ${result.replaced.name} scambiati.`);
   else if (target.role === 'starter') notify(`${name} in campo.`);
@@ -685,11 +835,20 @@ function setLineupSelection(id) {
 function dragAttributes(player) {
   return `data-lineup-drag="${html(player.id)}" data-drag-label="${html(player.name)}" aria-pressed="false"`;
 }
-function pitch(record, validation) {
+function lineupContextLabel(context, compact = false) {
+  if (!context) return '';
+  const { availability, fixtureLabel, opponentName, venue, manual } = context;
+  const fixture = compact && opponentName && venue ? `${opponentName} · ${venue === 'Casa' ? 'C' : 'T'}` : fixtureLabel;
+  const manualLabel = lineupManualLabel(manual);
+  const label = manualLabel ? `${manualLabel} · manuale` : compact && availability.status === 'unknown' ? 'Disp. da verificare' : availability.label;
+  return `<small class="lineup-player-context" data-availability="${html(availability.status)}">
+    <span>${html(fixture)}</span><span class="${manualLabel ? 'lineup-manual' : ''}" title="${html(manual?.reason ?? availability.reason ?? availability.label)}">${html(label)}</span>${context.penaltyTaker ? '<span>Rigorista</span>' : ''}</small>`;
+}
+function pitch(record, validation, context) {
   return `<div class="pitch" role="group" aria-label="Formazione ${html(record.formation)} sul campo">${['FWD', 'MID', 'DEF', 'GK'].map(role => {
     const picked = groupPlayers(record.starters).filter(p => p.position === role);
     const missing = Math.max(0, (validation.required[role] ?? 0) - picked.length);
-    return `<div class="pitch-row" aria-label="${ROLES[role]}">${picked.map(p => `<button type="button" class="pitch-player" ${dragAttributes(p)} data-lineup-drop="starter" data-drop-position="${role}" data-drop-player="${html(p.id)}"><span aria-hidden="true">${SHORT[role]}</span><span>${html(p.name)}</span></button>`).join('')}
+    return `<div class="pitch-row" aria-label="${ROLES[role]}">${picked.map(p => `<button type="button" class="pitch-player" ${dragAttributes(p)} data-lineup-drop="starter" data-drop-position="${role}" data-drop-player="${html(p.id)}"><span aria-hidden="true">${SHORT[role]}</span><span>${html(p.name)}</span>${lineupContextLabel(context.get(p.id), true)}</button>`).join('')}
       ${Array.from({ length: missing }, (_, index) => `<button type="button" class="pitch-player vacant" data-lineup-drop="starter" data-drop-position="${role}" aria-label="${ROLES[role]} · posto libero ${index + 1}"><span aria-hidden="true">${SHORT[role]}</span><span>Libero</span></button>`).join('')}</div>`;
   }).join('')}</div>`;
 }
@@ -700,6 +859,14 @@ function rosa() {
   const roster = groupPlayers(state.roster);
   const validation = validateLineup(starters, record.formation);
   const reserves = groupPlayers(record.reserves);
+  const context = playerContexts(roster);
+  const penaltyTakers = new Set(state.penaltyTakers);
+  for (const [id, item] of context) {
+    item.manual = manualAvailabilityFor(id);
+    item.penaltyTaker = penaltyTakers.has(id);
+  }
+  const previous = previousLineup();
+  const copy = previous?.record;
   const choices = dataset.players.filter(p => !state.roster.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'it'));
   const presetButton = mode === 'demo' && dataset.demoPreset
     ? '<button class="primary" data-load-preset>Carica rosa demo</button>'
@@ -712,7 +879,7 @@ function rosa() {
       ${choices.length ? `<form class="roster-add" id="roster-add"><label class="field-label">Aggiungi dal listone<select id="roster-choice" required><option value="">Seleziona calciatore</option>${choices.map(p => `<option value="${html(p.id)}">${html(p.name)} · ${html(getTeam(p.teamId)?.shortName)} · ${SHORT[p.position] ?? '—'}</option>`).join('')}</select></label><button type="submit">Aggiungi</button></form>` : ''}
       ${roster.length ? `<ul class="roster-list" data-lineup-scroll>${roster.map(p => {
         const active = record.starters.includes(p.id) ? 'starter' : record.reserves.includes(p.id) ? 'reserve' : 'none';
-        return `<li><button type="button" class="lineup-handle" ${dragAttributes(p)} aria-label="Sposta ${html(p.name)}"><span aria-hidden="true">⠿</span><span aria-hidden="true">${SHORT[p.position] ?? '—'}</span></button><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>
+        return `<li><button type="button" class="lineup-handle" ${dragAttributes(p)} aria-label="Sposta ${html(p.name)}"><span aria-hidden="true">⠿</span><span aria-hidden="true">${SHORT[p.position] ?? '—'}</span></button><div class="lineup-roster-player"><button class="player-name" data-player="${html(p.id)}">${html(p.name)}</button>${lineupContextLabel(context.get(p.id))}</div>
           ${p.id.startsWith('csv:') ? status('Da CSV · senza statistiche', 'partial') : ''}
           <select data-lineup-role="${html(p.id)}" aria-label="Impiego di ${html(p.name)}">${[['none','Fuori'],['starter','Titolare'],['reserve','Panchina']].map(([key,label]) => `<option value="${key}" ${key === active ? 'selected' : ''}>${label}</option>`).join('')}</select>
           <button data-remove="${html(p.id)}" aria-label="Rimuovi ${html(p.name)}">✕</button></li>`;
@@ -730,27 +897,55 @@ function rosa() {
     </section>
     <section class="panel lineup-formation">
       <div class="panel-head"><div><h2>Formazione</h2><p>Giornata ${round}</p></div>${status(validation.valid ? '11 titolari validi' : `${starters.length} / 11 titolari`, validation.valid ? 'available' : 'partial')}</div>
+      <div class="actions lineup-actions">
+        ${copy ? `<button type="button" data-lineup-copy>Copia formazione G${round - 1}</button>` : ''}
+        <button type="button" data-lineup-undo ${lineupUndo[mode].has(round) ? '' : 'disabled'}>Annulla ultima modifica</button>
+        <button type="button" data-lineup-suggest ${roster.length < 11 ? 'disabled' : ''}>Suggerisci formazione</button>
+      </div>
+      ${suggestionPanel()}
+      ${copy && lineupCopyPreview ? `<div class="notice neutral lineup-copy-preview"><p>La formazione della G${round - 1} sostituirà quella attuale. Modulo ${html(copy.formation)}, ${copy.starters.length} titolari, ${copy.reserves.length} riserve e ${copy.maxSubstitutions} cambi.${previous.missing ? ` ${previous.missing} calciatori non sono più disponibili nella rosa.` : ''}</p>
+        <div class="actions"><button type="button" data-lineup-copy-confirm>Sostituisci formazione</button><button type="button" data-lineup-copy-cancel>Mantieni quella attuale</button></div></div>` : ''}
       <div class="lineup-controls"><label class="field-label">Modulo<select id="formation">${FORMATION_OPTIONS.map(f => `<option value="${f}" ${f === record.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
         <label class="field-label">Max cambi<select id="substitutions">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${n === record.maxSubstitutions ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-      ${pitch(record, validation)}
+      ${pitch(record, validation, context)}
       ${!validation.valid && starters.length ? `<p class="inline-status">${html(validation.errors.join(' '))}</p>` : ''}
       <div class="duel lineup-bench"><h3>Panchina</h3><p>Priorità dall’alto verso il basso. Sostituzioni fra calciatori dello stesso ruolo.</p>
-      ${reserves.length ? `<ol class="bench">${reserves.map((p, i) => `<li data-lineup-drop="reserve" data-drop-player="${html(p.id)}"><button type="button" class="bench-player" ${dragAttributes(p)}><span aria-hidden="true">⠿</span> ${html(p.name)} <small>${SHORT[p.position] ?? '—'}</small></button><button data-reserve="${html(p.id)}" data-move="-1" aria-label="Sposta ${html(p.name)} in alto" ${i === 0 ? 'disabled' : ''}>↑</button><button data-reserve="${html(p.id)}" data-move="1" aria-label="Sposta ${html(p.name)} in basso" ${i === reserves.length - 1 ? 'disabled' : ''}>↓</button></li>`).join('')}</ol>` : ''}
+      ${reserves.length ? `<ol class="bench">${reserves.map((p, i) => `<li data-lineup-drop="reserve" data-drop-player="${html(p.id)}"><button type="button" class="bench-player" ${dragAttributes(p)}><span aria-hidden="true">⠿</span> ${html(p.name)} <small>${SHORT[p.position] ?? '—'}</small>${lineupContextLabel(context.get(p.id), true)}</button><button data-reserve="${html(p.id)}" data-move="-1" aria-label="Sposta ${html(p.name)} in alto" ${i === 0 ? 'disabled' : ''}>↑</button><button data-reserve="${html(p.id)}" data-move="1" aria-label="Sposta ${html(p.name)} in basso" ${i === reserves.length - 1 ? 'disabled' : ''}>↓</button></li>`).join('')}</ol>` : ''}
       <button class="lineup-drop-button" type="button" data-lineup-drop="reserve" data-drop-append>Aggiungi in coda</button></div>
       <button class="lineup-drop-button lineup-drop-out" type="button" data-lineup-drop="none">Fuori formazione</button>
       <a class="btn primary" href="#simulazione">Vai alla simulazione ${iconSpan('arrow')}</a>
+      <a class="btn quiet" href="#match" data-show-difficulty>Difficoltà prossime giornate</a>
     </section>
   </div>`;
+}
+function playerContexts(players) {
+  return buildLineupContext(players, { fixtures: dataset.fixtures, absences: dataset.absences, round,
+    getTeam, getPlayerFixture, getAvailability: (player, fixture, absences) =>
+      getAvailability(player, fixture, absences, manualAvailabilityFor(player.id)),
+    isUpcoming: fixture => fixture.status === 'scheduled' && (mode === 'demo' || isPendingFixture(fixture)) });
+}
+function suggestionPanel() {
+  if (!lineupSuggestion) return '';
+  const { lineup: proposed, method, expectedPoints, gain, eligible, rosterCount, comparedModules, sample, reason } = lineupSuggestion;
+  if (!proposed) return `<p class="notice neutral" role="status">${html(reason)} ${number(11 - lineupSuggestion.missingStarters)}/11 ruoli coperti nel miglior modulo.</p>`;
+  return `<div class="notice neutral lineup-copy-preview" role="status">
+    <strong>${html(proposed.formation)} · ${number(expectedPoints, 2)} fantapunti attesi</strong>
+    <p>${html(projectionLabel(method))} · 11 titolari coperti · ${eligible}/${rosterCount} in rosa · ${comparedModules} moduli confrontati.
+    ${sample.players ? ` Campione · ${sample.minimum}–${sample.maximum} osservazioni per titolare.` : ''}
+    ${Number.isFinite(gain) ? ` Differenza attesa · ${gain >= 0 ? '+' : ''}${number(gain, 2)} prima delle sostituzioni.` : ''}</p>
+    <details><summary>Undici e panchina proposti</summary><p>Titolari · ${html(groupPlayers(proposed.starters).map(p => p.name).join(', '))}</p>
+    <p>Panchina · ${html(groupPlayers(proposed.reserves).map(p => p.name).join(', ')) || 'Nessuna riserva con stima'}</p></details>
+    <button type="button" data-lineup-accept>Applica suggerimento</button></div>`;
 }
 function linkRosterPlayer(state, localId, id) {
   const replace = values => [...new Set(values.map(value => value === localId ? id : value))];
   state.roster = replace(state.roster);
-  for (const record of Object.values(state.lineups)) {
+  for (const record of [...Object.values(state.lineups), ...Object.values(state.references), ...lineupUndo[mode].values()]) {
     record.starters = replace(record.starters);
     record.reserves = replace(record.reserves).filter(value => !record.starters.includes(value));
   }
   delete state.rosterLocals[localId];
-  simulationResult = undefined;
+  invalidateLineupResults();
 }
 function importCsv(text) {
   const { entries, unresolved } = readRosterCsv(text, dataset);
@@ -793,17 +988,32 @@ function restoreBackup(text) {
     const base = storage[m];
     base.roster = [...new Set([...(base.roster ?? []), ...(incoming[m].roster ?? [])])];
     base.rosterLocals = { ...incoming[m].rosterLocals, ...base.rosterLocals };
+    base.availability ??= {};
+    base.forecasts = { ...incoming[m].forecasts, ...base.forecasts };
+    base.penaltyTakers = [...new Set([...(base.penaltyTakers ?? []), ...(incoming[m].penaltyTakers ?? [])])];
+    base.scoring ??= incoming[m].scoring;
+    for (const [day, reports] of Object.entries(incoming[m].availability ?? {})) {
+      base.availability[day] = { ...reports, ...base.availability[day] };
+    }
     base.lineups ??= {};
+    base.references ??= {};
     for (const [day, record] of Object.entries(incoming[m].lineups ?? {})) {
       const existing = base.lineups[day];
       if (existing && (existing.starters.length || existing.reserves.length)) kept++;
       else {
         base.lineups[day] = record;
+        lineupUndo[m].delete(Number(day));
         base.roster = [...new Set([...base.roster, ...record.starters, ...record.reserves])];
       }
     }
+    for (const [day, record] of Object.entries(incoming[m].references ?? {})) {
+      if (base.references[day]) continue;
+      base.references[day] = record;
+      base.roster = [...new Set([...base.roster, ...record.starters, ...record.reserves])];
+    }
   }
-  simulationResult = undefined;
+  invalidateLineupResults();
+  lineupCopyPreview = false;
   save();
   return kept ? `Backup unito. ${kept} formazioni già presenti sono state conservate.` : 'Backup importato e unito alle rose salvate.';
 }
@@ -838,7 +1048,7 @@ function indexVotes(imported) {
 function setVotesImport(imported) {
   votesImport = imported;
   votesByPlayer = indexVotes(imported);
-  simulationResult = undefined;
+  invalidateLineupResults();
   try {
     if (imported) localStorage.setItem(VOTES_KEY, JSON.stringify(imported));
     else localStorage.removeItem(VOTES_KEY);
@@ -883,6 +1093,81 @@ const PROJECTION_LABELS = {
 };
 function projectionLabel(method) { return PROJECTION_LABELS[method] ?? 'Metodo mancante'; }
 
+function validLineup(record) {
+  return Boolean(record && validateLineup(groupPlayers(record.starters), record.formation).valid);
+}
+function lineupComparisonPanel() {
+  const reference = modeState().references[round];
+  const canSave = validLineup(lineup());
+  return renderLineupComparison({ reference, result: lineupComparisonResult, html, number, percent, projectionLabel,
+    canSave, canCompare: canSave && validLineup(reference) });
+}
+function updateComparisonPanel(focus) {
+  const panel = $('[data-lineup-comparison]');
+  if (!panel) return;
+  panel.outerHTML = lineupComparisonPanel();
+  if (focus) $(focus)?.focus({ preventScroll: true });
+}
+function handleLineupReference(action) {
+  const state = modeState();
+  const record = lineup();
+  if (action === 'save' && validLineup(record)) {
+    state.references[round] = lineupSnapshot(record);
+    lineupComparisonResult = undefined;
+    save();
+    updateComparisonPanel('[data-lineup-reference="save"]');
+    notify('Formazione di riferimento salvata.');
+  }
+  if (action === 'restore' && state.references[round]) {
+    changeLineup(state.references[round], () => $('[data-lineup-undo]'));
+    notify('Formazione di riferimento ripristinata.');
+  }
+}
+function simulationFor(form) {
+  const data = new FormData(form);
+  const options = { dataset, mode, round, iterations: Number(data.get('iterations')), seed: Number(data.get('seed')), asOf: Date.now(),
+    fantasySamples: mode === 'real' ? leagueFantasySamples() : undefined,
+    leagueVotesByPlayer: mode === 'real' ? votesByPlayer : undefined, ...scoringOptions() };
+  return record => simulateLineup(groupPlayers(record.starters), {
+    ...options, formation: record.formation, reserves: groupPlayers(record.reserves), maxSubstitutions: record.maxSubstitutions
+  });
+}
+function scoringOptions() {
+  const predictions = new Map();
+  const prior = mode === 'real' ? historicalArchive?.fixtures : undefined;
+  return {
+    scoring: modeState().scoring, manualAvailability: roundAvailability(), penaltyTakers: new Set(modeState().penaltyTakers),
+    fixtureScore(fixture) {
+      if (!predictions.has(fixture.id)) predictions.set(fixture.id, matchScoreSampler(predictMatch(fixture, dataset.fixtures, prior)));
+      return predictions.get(fixture.id);
+    }
+  };
+}
+const SCORING_LABELS = {
+  goal: 'Gol', assist: 'Assist', yellowCard: 'Ammonizione', redCard: 'Espulsione', goalkeeperConceded: 'Gol subito dal portiere',
+  penaltyScored: 'Rigore segnato', penaltyMissed: 'Rigore sbagliato', penaltySaved: 'Rigore parato',
+  cleanSheet: 'Porta inviolata', ownGoal: 'Autogol', defenseAt6: 'Bonus da 6', defenseAt65: 'Bonus da 6,5', defenseAt7: 'Bonus da 7'
+};
+function scoringPanel() {
+  const rules = sanitizeScoring(modeState().scoring);
+  return `<details class="panel stacked"><summary>Regolamento Classic</summary>
+    <p class="inline-status">Questi valori si applicano alla simulazione per eventi quando il dato è disponibile. I fantavoti importati usano il proprio regolamento.</p>
+    <form id="classic-scoring"><div class="scoring-fields">${Object.entries(SCORING_LABELS).map(([key, label]) =>
+      `<label class="field-label">${label}<input type="number" name="${key}" min="-30" max="30" step="0.01" required value="${rules[key]}"></label>`).join('')}</div>
+    <div class="form-fields">
+      <label><input type="checkbox" name="defenseModifier" ${rules.defenseModifier ? 'checked' : ''}> Modificatore di difesa</label>
+      <label><input type="checkbox" name="defenseIncludesKeeper" ${rules.defenseIncludesKeeper ? 'checked' : ''}> Includi il portiere</label>
+    </div><button type="submit">Salva regolamento</button></form></details>`;
+}
+function runLineupComparison() {
+  const form = $('#simulation-form');
+  const reference = modeState().references[round];
+  const record = lineup();
+  if (!validLineup(reference) || !validLineup(record) || !form?.reportValidity()) return;
+  lineupComparisonResult = compareLineups(reference, record, simulationFor(form));
+  updateComparisonPanel('[data-lineup-compare]');
+}
+
 function simulatorOutput(result, single = false) {
   if (!result) return empty('I risultati compariranno dopo aver avviato la simulazione.');
   const exclusions = result.excluded?.length ? `<details><summary>Esclusioni per dati insufficienti (${result.excluded.length})</summary><ul>${result.excluded.map(item => `<li>${html(item.name)} · ${html(item.reason)}</li>`).join('')}</ul></details>` : '';
@@ -919,8 +1204,70 @@ function simulazione() {
       <button class="primary" type="submit" ${validation.valid ? '' : 'disabled'}>Avvia simulazione</button>
     </form>
     <p class="inline-status">Stesso seed, stessi dati e stessa formazione producono lo stesso risultato. <a class="text-link" href="#fonti">Regole del modello</a></p>
+    ${lineupUndo[mode].has(round) ? '<button type="button" data-lineup-undo>Annulla ultima modifica</button>' : ''}
     ${mode === 'demo' && dataset.demoPreset ? '<button data-load-preset>Carica rosa demo</button>' : ''}
-  </section><section class="panel" id="simulation-output" aria-live="polite">${simulatorOutput(simulationResult)}</section></div>`;
+  </section><section class="panel" id="simulation-output" aria-live="polite">${lineupSimulationOutput()}</section></div>
+  ${lineupComparisonPanel()}
+  ${scoringPanel()}`;
+}
+function canArchiveForecast() {
+  const games = byRound();
+  return Number.isFinite(simulationResult?.mean) && games.length > 0 &&
+    games.every(fixture => fixture.status === 'scheduled' && (mode === 'demo' || isPendingFixture(fixture)));
+}
+function lineupSimulationOutput() {
+  return simulatorOutput(simulationResult) + (canArchiveForecast() ? `<div class="actions forecast-actions">
+    <button type="button" data-save-forecast>${modeState().forecasts[round] ? 'Aggiorna previsione salvata' : 'Salva previsione'}</button>
+    <a class="btn quiet" href="#rendimento">Vai al rendimento</a></div>` : '');
+}
+function saveForecast() {
+  if (!canArchiveForecast()) return;
+  const record = lineup();
+  const entries = new Map(simulationResult.individual.map(row => [row.id,row]));
+  const players = ids => groupPlayers(ids).map(({ id, name, position }) => ({ id, name, position, expectedPoints:entries.get(id)?.mean ?? null }));
+  const method = simulationResult.method;
+  const source = method === 'league-history' ? votesImport?.source : method === 'fantatb-history' ? 'FantaTB' : null;
+  const forecast = { season:dataset.season, round, asOf:new Date().toISOString(), starters:players(record.starters),
+    reserves:players(record.reserves), maxSubstitutions:record.maxSubstitutions, expectedPoints:simulationResult.mean,
+    coverage:simulationResult.coverage, complete:!simulationResult.excluded.length && method !== 'events',
+    method, source, sourceId:method === 'fantatb-history' ? 'fantatb' : null };
+  modeState().forecasts[round] = forecast;
+  save();
+  $('#simulation-output').innerHTML = lineupSimulationOutput();
+  $('[data-save-forecast]')?.focus({preventScroll:true});
+  notify('Previsione della giornata salvata.');
+}
+function realizedVote(player, day, season, local) {
+  if (local) {
+    const sample = votesByPlayer.get(player.id);
+    const row = sample?.rows.find(item => item.round === day && item.season === season);
+    return row && { fantasyRating:row.fantasyRating, source:sample.source };
+  }
+  const source = dataset.sources.find(item => item.id === 'transferbeat-ratings');
+  if (!source?.archives?.some(item => item.round === day)) return undefined;
+  const row = getPlayer(player.id)?.ratings?.find(item => item.round === day);
+  if (row && (row.fantasyRating !== null || source.ambiguousRatings === 0)) {
+    return { fantasyRating:row.fantasyRating, source:'FantaTB', sourceId:'fantatb' };
+  }
+}
+function rendimento() {
+  const records = Object.values(modeState().forecasts).sort((a,b) => b.round - a.round);
+  return `${heading('Rendimento della rosa', 'Confronta le previsioni salvate prima della giornata con i fantavoti acquisiti.')}
+    ${records.length ? records.map(forecast => {
+      const local = forecast.method === 'league-history' || (forecast.method !== 'fantatb-history' && forecast.starters.some(player =>
+        votesByPlayer.get(player.id)?.rows.some(row => row.round === forecast.round && row.season === forecast.season)));
+      const result = evaluateLineupPerformance(forecast, (player, day, season) => mode === 'real' ? realizedVote(player, day, season, local) : undefined);
+      return `<section class="panel stacked"><h2>Giornata ${forecast.round}</h2>
+        <p>${html(projectionLabel(result.method))} · ${html(date(forecast.asOf))} · copertura previsione ${percent(result.expectedCoverage)}.</p>
+        <div class="detail-grid">${stat('Fantapunti attesi',number(result.expectedPoints,2))}${stat('Fantapunti reali',number(result.actualPoints,2))}
+        ${stat('Scarto reale − attesi',number(result.difference,2))}${stat('Posti verificati',`${result.coverage.known}/${result.coverage.total}`)}</div>
+        <p class="muted">${result.source ? `Fonte voti · ${html(result.source)}. ` : ''}${html(result.reason)}</p>
+        <details><summary>Rendimento dei calciatori</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Rendimento individuale G${forecast.round}">
+        <table><thead><tr><th>Calciatore</th><th>Attesi accreditati</th><th>Fantavoto</th><th>Punti accreditati</th></tr></thead><tbody>
+        ${result.rows.map(row => `<tr><th scope="row">${html(row.name)}<br><small>${row.kind === 'starter' ? 'Titolare' : 'Riserva'}</small></th>
+          <td>${number(row.expectedPoints,2)}</td><td>${row.recorded && row.fantasyRating === null ? 'SV' : number(row.fantasyRating,2)}</td><td>${number(row.creditedPoints,2)}</td></tr>`).join('')}
+        </tbody></table></div></details></section>`;
+    }).join('') : '<section class="panel"><p>Salva una previsione in Simulazione prima che cominci la giornata.</p><a class="btn" href="#simulazione">Apri simulazione</a></section>'}`;
 }
 function fonti() {
   const sources = dataset.sources.map(source => {
@@ -977,10 +1324,25 @@ function getMarket() {
   marketCache = { dataset, round, rosterKey, result };
   return result;
 }
+function leagueStats() {
+  const source = marketImports.listone;
+  if (mode !== 'real' || !source) return new Map();
+  const rosterLocals = Object.values(modeState().rosterLocals);
+  const key = rosterLocals.map(player => player.id).sort().join('\0');
+  if (leagueStatsCache?.source !== source || leagueStatsCache.dataset !== dataset || leagueStatsCache.key !== key) {
+    const values = indexLeagueStatistics(source.rows, dataset.players, dataset.teams);
+    const localStats = indexLeagueStatistics(source.rows, rosterLocals, dataset.teams);
+    for (const [id, stats] of localStats) values.set(id, stats);
+    leagueStatsCache = { source, dataset, key, values };
+  }
+  return leagueStatsCache.values;
+}
 function leagueFantasySamples() {
   const source = marketImports.listone;
   const asOfRound = source?.asOfRound;
-  if (mode !== 'real' || !Number.isInteger(asOfRound) || round <= asOfRound) return new Map();
+  if (mode !== 'real' || !Number.isInteger(asOfRound) || round !== asOfRound + 1) return new Map();
+  const stats = leagueStats();
+  if (leagueSamplesCache?.stats === stats && leagueSamplesCache.round === round) return leagueSamplesCache.samples;
   const knownGames = new Map();
   for (const fixture of dataset.fixtures) {
     if (fixture.round > asOfRound || fixture.status !== 'played') continue;
@@ -988,14 +1350,16 @@ function leagueFantasySamples() {
       knownGames.set(teamId, (knownGames.get(teamId) ?? 0) + 1);
     }
   }
-  return new Map(getMarket().roster.flatMap(profile => {
-    const teamGames = knownGames.get(profile.teamId) ?? 0;
-    if (profile.source !== 'listone' || profile.resolution !== 'matched' || teamGames !== asOfRound ||
-        !Number.isInteger(profile.appearances) || profile.appearances > teamGames || !Number.isFinite(profile.fantasyAverage)) return [];
-    return [[profile.rosterId, {
-      gamesWithVote: profile.appearances, fantasyAverage: profile.fantasyAverage, teamGames, asOfRound
-    }]];
-  }));
+  const samples = new Map();
+  for (const [id, sample] of stats) {
+    const teamGames = knownGames.get(getPlayer(id)?.teamId) ?? 0;
+    if (teamGames === asOfRound && Number.isInteger(sample.gamesWithVote) &&
+      sample.gamesWithVote <= teamGames && Number.isFinite(sample.fantasyAverage)) {
+      samples.set(id, { ...sample, teamGames, asOfRound });
+    }
+  }
+  leagueSamplesCache = { stats, round, samples };
+  return samples;
 }
 function completeRounds() {
   return rounds().filter(day => {
@@ -1322,8 +1686,10 @@ function analisi() {
     <div class="split overview-rounds">${votesPanel()}
       <section class="panel"><h2>Verifica retrospettiva 1X2</h2>
         ${validation?.matches ? `<p>${number(validation.matches)} partite 2026/27. Per ogni partita il modello usa soltanto risultati dei giorni precedenti. Il riferimento usa le medie casa e trasferta di Serie A.</p>
-        <div class="detail-grid">${stat('Brier · modello', number(validation.model.brier,3))}${stat('Brier · riferimento', number(validation.baseline.brier,3))}
-        ${stat('Log loss · modello', number(validation.model.logLoss,3))}${stat('Log loss · riferimento', number(validation.baseline.logLoss,3))}</div><p>Valori più bassi indicano previsioni migliori sul campione.</p>`
+        <div class="table-wrap"><table><thead><tr><th>Metodo</th><th>Brier</th><th>Log loss</th></tr></thead><tbody>
+        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes]].map(([label, scores]) =>
+          `<tr><th scope="row">${label}</th><td>${number(scores?.brier,4)}</td><td>${number(scores?.logLoss,4)}</td></tr>`).join('')}</tbody></table></div>
+        <p>Modello scelto · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. Correzione valutata su ${number(validation.dixonColesMatches)} gare. Valori più bassi indicano previsioni migliori sul campione.</p>`
         : '<p>Verifica disponibile con l’archivio della stagione precedente e risultati acquisiti.</p>'}</section>
     </div>`;
 }
@@ -1338,7 +1704,7 @@ function setPage(next) {
   if (page === next) { render(); return; }
   page = next;
   render();
-  if (['analisi','match'].includes(next) && mode === 'real') void loadHistoricalArchive();
+  if (['analisi','match','simulazione'].includes(next) && mode === 'real') void loadHistoricalArchive();
   window.scrollTo(0,0);
   $('#workspace').focus({ preventScroll: true });
 }
@@ -1364,7 +1730,7 @@ function wireEvents() {
       votesImport = readVotesImport();
       votesByPlayer = indexVotes(votesImport);
       votesReport = undefined;
-      simulationResult = undefined;
+      invalidateLineupResults();
       if (dataset && mode === 'real') render();
       return;
     }
@@ -1372,10 +1738,12 @@ function wireEvents() {
     if (!Object.hasOwn(MARKET_UPLOADS,kind)) return;
     marketImports[kind] = readMarketSource(kind);
     marketCache = undefined;
-    if (page === 'mercato' && mode === 'real') render();
+    if (kind === 'listone') invalidateLineupResults();
+    if (dataset && ['mercato','simulazione'].includes(page) && mode === 'real') render();
   });
   dialog.addEventListener('close', () => lastFocus?.isConnected && lastFocus.focus());
   document.addEventListener('click', event => {
+    if (event.target.closest('[data-show-difficulty]')) showDifficulty = true;
     if (page === 'rosa' && dataset && pageView.contains(event.target)) {
       const handle = event.target.closest('[data-lineup-drag]');
       const zone = event.target.closest('[data-lineup-drop]');
@@ -1403,6 +1771,30 @@ function wireEvents() {
     const data = control.dataset;
     if (data.mode) { if (data.mode !== mode || pageView.getAttribute('aria-busy') === 'true') { importReport = undefined; void switchMode(data.mode); } return; }
     if (!dataset) return;
+    if (page === 'rosa') {
+      if ('lineupSuggest' in data) {
+        lineupSuggestion = suggestLineup(groupPlayers(modeState().roster), lineup(), {
+          formations:FORMATION_OPTIONS, validate:validateLineup, analyze:playerAnalysis });
+        renderLineupChange(() => $('[data-lineup-accept]') ?? $('[data-lineup-suggest]'));
+        return;
+      }
+      if ('lineupAccept' in data && lineupSuggestion?.lineup) {
+        changeLineup(lineupSuggestion.lineup, () => $('[data-lineup-undo]'));
+        notify('Formazione suggerita applicata.');
+        return;
+      }
+      if ('lineupCopy' in data || 'lineupCopyConfirm' in data) copyPreviousLineup('lineupCopyConfirm' in data);
+      if ('lineupCopyCancel' in data) {
+        lineupCopyPreview = false;
+        renderLineupChange(() => $('[data-lineup-copy]'));
+      }
+    }
+    if (['rosa','simulazione'].includes(page) && 'lineupUndo' in data) undoLineupChange();
+    if (page === 'simulazione') {
+      if (data.lineupReference) handleLineupReference(data.lineupReference);
+      if ('lineupCompare' in data) runLineupComparison();
+      if ('saveForecast' in data) saveForecast();
+    }
     if ('votesTemplate' in data) {
       download('Stagione;Giornata;ID FantaLab;Nome;Squadra;Ruolo;Fantavoto;Voto\r\n', 'fantalab-fantavoti.csv', 'text/csv;charset=utf-8');
     }
@@ -1464,7 +1856,7 @@ function wireEvents() {
       if (player) $('#individual-simulation').innerHTML = simulatorOutput(simulateLineup([player], {
         dataset, mode, round, iterations: 5000, seed: 202627, maxSubstitutions: 0,
         fantasySamples: mode === 'real' ? leagueFantasySamples() : undefined,
-        leagueVotesByPlayer: mode === 'real' ? votesByPlayer : undefined
+        leagueVotesByPlayer: mode === 'real' ? votesByPlayer : undefined, ...scoringOptions()
       }), true);
     }
     if (data.add) {
@@ -1493,6 +1885,18 @@ function wireEvents() {
   document.addEventListener('change', async event => {
     if (!dataset) return;
     const { id, value } = event.target;
+    if (event.target.dataset.penaltyTaker) {
+      const playerId = event.target.dataset.penaltyTaker;
+      const takers = new Set(modeState().penaltyTakers);
+      if (event.target.checked) takers.add(playerId);
+      else takers.delete(playerId);
+      modeState().penaltyTakers = [...takers];
+      invalidateLineupResults();
+      save();
+      if (page === 'rosa') renderLineupChange();
+      if (page === 'simulazione') render();
+      return;
+    }
     if (id === 'votes-csv') {
       const file = event.target.files?.[0];
       if (file && mode === 'real') await importVotesFile(file, $('#votes-source').value.trim());
@@ -1513,7 +1917,7 @@ function wireEvents() {
       const day = Number(value);
       const asOfRound = completeRounds().includes(day) ? day : undefined;
       const saved = saveMarketSource('listone', { ...marketImports.listone, asOfRound });
-      simulationResult = undefined;
+      invalidateLineupResults();
       if (!saved) notify('Il browser non ha salvato la giornata del listone.');
     }
     if (marketFilter) {
@@ -1531,7 +1935,7 @@ function wireEvents() {
     if (filter) { filters[filter] = value; filters.page = 1; refreshPlayers(); }
     const compare = event.target.dataset.compare;
     if (compare) {
-      if (event.target.checked && selectedComparison[mode].length >= 2) {
+      if (event.target.checked && selectedComparison[mode].length >= 3) {
         event.target.checked = false;
         notify('Deseleziona un calciatore prima di confrontarne un altro.');
       } else {
@@ -1540,8 +1944,12 @@ function wireEvents() {
       }
     }
     if (event.target.dataset.lineupRole) setLineupRole(event.target.dataset.lineupRole, value);
-    if (id === 'formation' && FORMATION_OPTIONS.includes(value)) { lineup().formation = value; simulationResult = undefined; save(); render(); $('#formation').focus(); }
-    if (id === 'substitutions') { lineup().maxSubstitutions = Number(value); simulationResult = undefined; save(); }
+    if (id === 'formation' && FORMATION_OPTIONS.includes(value)) {
+      changeLineup({ ...lineup(), formation: value }, () => $('#formation'));
+    }
+    if (id === 'substitutions') {
+      changeLineup({ ...lineup(), maxSubstitutions: Number(value) }, () => $('#substitutions'));
+    }
     if (id === 'roster-csv' || id === 'backup-json') {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -1556,6 +1964,41 @@ function wireEvents() {
     }
   });
   document.addEventListener('submit', event => {
+    if (event.target.id === 'classic-scoring') {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      const settings = Object.fromEntries(Object.keys(SCORING_LABELS).map(key => [key, Number(data.get(key))]));
+      modeState().scoring = sanitizeScoring({ ...settings,
+        defenseModifier: data.has('defenseModifier'), defenseIncludesKeeper: data.has('defenseIncludesKeeper') });
+      invalidateLineupResults();
+      save();
+      render();
+      $('#classic-scoring').closest('details').open = true;
+      $('#classic-scoring button').focus({ preventScroll: true });
+      notify('Regolamento salvato.');
+      return;
+    }
+    if (event.target.id === 'manual-availability') {
+      event.preventDefault();
+      const { playerId, round: day } = event.target.dataset;
+      if (!getPlayer(playerId) || Number(day) !== round) return;
+      const data = new FormData(event.target);
+      const record = manualAvailabilityRecord({ status: data.get('status'), reason: data.get('reason'), diffidato: data.has('diffidato') });
+      const state = modeState();
+      const reports = state.availability[round] ??= {};
+      if (record) Object.defineProperty(reports, playerId, { value: record, enumerable: true, writable: true, configurable: true });
+      else delete reports[playerId];
+      if (!Object.keys(reports).length) delete state.availability[round];
+      invalidateLineupResults();
+      save();
+      if (page === 'rosa') renderLineupChange();
+      if (page === 'giocatori') refreshPlayers();
+      if (page === 'simulazione') render();
+      showPlayer(playerId);
+      $('#manual-availability button[type="submit"]')?.focus({ preventScroll: true });
+      notify(record ? 'Segnalazione salvata per questa giornata.' : 'Segnalazione manuale rimossa.');
+      return;
+    }
     if (event.target.id === 'roster-add') {
       event.preventDefault();
       addPlayer($('#roster-choice').value);
@@ -1564,17 +2007,13 @@ function wireEvents() {
     }
     if (event.target.id === 'simulation-form') {
       event.preventDefault();
-      const data = new FormData(event.target);
-      const record = lineup();
-      simulationResult = simulateLineup(groupPlayers(record.starters), {
-        dataset, mode, round, formation: record.formation, reserves: groupPlayers(record.reserves),
-        maxSubstitutions: record.maxSubstitutions, iterations: Number(data.get('iterations')), seed: Number(data.get('seed')),
-        fantasySamples: mode === 'real' ? leagueFantasySamples() : undefined,
-        leagueVotesByPlayer: mode === 'real' ? votesByPlayer : undefined
-      });
-      $('#simulation-output').innerHTML = simulatorOutput(simulationResult);
+      simulationResult = simulationFor(event.target)(lineup());
+      $('#simulation-output').innerHTML = lineupSimulationOutput();
     }
   });
 }
 wireEvents();
 void switchMode('real');
+if (document.querySelector('meta[name="fantalab-offline"]')?.content === 'enabled' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}

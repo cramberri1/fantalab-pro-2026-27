@@ -53,8 +53,8 @@ test('fixture absence admits first available bench player of the same role', () 
   assert.equal(analyzePlayer(forward, { dataset: fixtureDataset }).expectedPoints, 0);
   const run = simulateLineup([forward], { dataset: fixtureDataset, reserves: [alternate], iterations: 30 });
   assert.equal(run.status, 'simulated');
-  assert.equal(run.mean, 6);
-  assert.equal(run.p10, 6);
+  assert.ok(Math.abs(run.mean - 6) < 0.3);
+  assert.ok(run.p10 < 6 && run.p90 > 6);
   assert.equal(run.individual[0].usedProbability, 0);
   assert.equal(run.individual[1].usedProbability, 1);
   assert.equal(simulateLineup([forward], { dataset: fixtureDataset, reserves: [alternate], maxSubstitutions: 0, iterations: 30 }).mean, 0);
@@ -70,6 +70,21 @@ test('seeded simulations reproduce their distribution and approximate analytical
   assert.ok(Math.abs(run.individual[0].sampledAppearanceProbability - 0.5) < 0.02);
   assert.equal(run.histogram.reduce((total, bin) => total + bin.count, 0), run.iterations);
   assert.deepEqual(run, simulateLineup([variable], options));
+});
+
+test('shared team score assigns one goal and clean-sheet bonus once with a reproducible seed', () => {
+  const striker = { ...forward, id: 's1', goals: 4 };
+  const second = { ...striker, id: 's2' };
+  const keeper = { ...forward, id: 'k', position: 'GK' };
+  const source = { ...dataset, players: [striker, second, keeper] };
+  const options = { dataset: source, iterations: 500, seed: 51,
+    fixtureScore: () => ({ homeRate: 1, awayRate: 1, sampleScore: () => [1, 0] }) };
+  const players = [striker, second, keeper];
+  const control = simulateLineup(players, { ...options, scoring: { goal: 0, cleanSheet: 0 } });
+  const forecast = simulateLineup(players, { ...options, scoring: { goal: 3, cleanSheet: 1 } });
+  assert.ok(Math.abs(forecast.mean - control.mean - 4) < 1e-9);
+  assert.ok(forecast.p10 < forecast.p90);
+  assert.deepEqual(forecast, simulateLineup(players, { ...options, scoring: { goal: 3, cleanSheet: 1 } }));
 });
 
 test('formation validation counts unique players by role', () => {
@@ -180,6 +195,23 @@ test('local league CSV takes precedence and uses only explicit current-season ob
     leagueVotesByPlayer: new Map([[player.id,leagueVotes]]) });
   assert.equal(simulation.method, 'league-history');
   assert.ok(Math.abs(simulation.mean - 7 / 3) < 0.1);
+});
+
+test('uses the league vote sample for a distinct index and respects manual suspension and doubt', () => {
+  const player = { ...fantasyOnly, ratings: [] };
+  const sourceDataset = { ...realDataset, players: [player] };
+  const options = { dataset: sourceDataset, round: 5, asOf: predictionTime,
+    fantasySample: { gamesWithVote: 3, fantasyAverage: 7, averageRating: 6, teamGames: 4, asOfRound: 4 } };
+  const projection = analyzePlayer(player, options);
+  assert.equal(projection.indexMethod, 'league-average');
+  assert.equal(projection.index, 66);
+  assert.equal(projection.coverage, 1);
+  const doubt = analyzePlayer(player, { ...options, manualAvailability: { status: 'doubtful' } });
+  assert.equal(doubt.expectedPoints, projection.expectedPoints * 0.75);
+  const out = analyzePlayer(player, { ...options, manualAvailability: { status: 'suspended', diffidato: true } });
+  assert.equal(out.availability.source, 'manual');
+  assert.equal(out.expectedPoints, 0);
+  assert.equal(analyzePlayer(player, { ...options, manualAvailability: { diffidato: true } }).expectedPoints, projection.expectedPoints);
 });
 
 test('private league samples cover local roster IDs and preserve one scoring basis per simulation', () => {

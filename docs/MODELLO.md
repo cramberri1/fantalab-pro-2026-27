@@ -19,7 +19,7 @@ Se manca un componente, i pesi degli altri vengono riscalati. La copertura somma
 
 Le frequenze di gol e assist per 90 minuti combinano il 65% del valore atteso e il 35% degli eventi registrati quando entrambi sono disponibili. Se è disponibile uno solo dei due, si usa quello. Il valore del provider conserva la propria provenienza. Il fattore avversario per i gol e gli assist stimati va da 0,8 a 1,2. La stima per il portiere usa anche la media tra i gol subiti di recente dalla sua squadra e i gol segnati di recente dall’avversario, con almeno quattro partite utili per squadra.
 
-Nel modello per eventi, il voto base è fisso a 6 in ogni presenza simulata. Ogni gol vale +3 e ogni assist +1. Dove lo storico è sufficiente, il modello sottrae 0,5 per una possibile ammonizione e 1 per ogni gol subito da un portiere.
+Nel modello per eventi il voto base è centrato su 6. La deviazione standard usa almeno 20 voti FantaTB del ruolo, pubblicati prima della previsione. In mancanza di campione usa 0,45 per portieri, difensori e centrocampisti e 0,50 per attaccanti. Il regolamento Classic in **Simulazione** permette di cambiare i bonus e i malus. Le penalità prive di dati vengono indicate nelle note. Il modificatore difesa considera, dopo i cambi, almeno quattro difensori a voto e il portiere se previsto dal regolamento.
 
 In modalità reale, la stima del fantapunteggio privilegia le basi di voto disponibili. Quando sono disponibili minuti e statistiche di gioco, l’indice di schierabilità continua a usarli.
 
@@ -27,15 +27,23 @@ In modalità reale, la stima del fantapunteggio privilegia le basi di voto dispo
 - **FantaTB.** Campiona i fantavoti registrati prima della partita, con almeno tre osservazioni esplicite e almeno due voti. Una riga assente resta sconosciuta. I senza voto espliciti entrano nel campione solo se l’archivio è privo di voti ambigui.
 - **Excel di lega.** Dopo aver indicato la giornata inclusa nel file in **Mercato**, il modello può usare le partite a voto e la fantamedia della lega per la giornata immediatamente successiva. La probabilità di ricevere voto è il rapporto tra voti e gare concluse della squadra. Con almeno tre voti, ogni esito a voto usa la fantamedia del file. La variabilità del voto non si ricava da una sola media.
 
-Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. A parità di copertura ha precedenza il CSV di lega, seguito da Excel, FantaTB e statistiche di gioco. La tabella mostra il metodo impiegato e le eventuali esclusioni. Il calcolo dell’indice di schierabilità richiede le statistiche di gioco.
+Una simulazione di formazione usa una sola base di punteggio, selezionata per coprire più titolari. A parità di copertura ha precedenza il CSV di lega, seguito da Excel, FantaTB e statistiche di gioco. La tabella mostra il metodo impiegato e le eventuali esclusioni.
+
+Con il metodo Excel, se l’indice da statistiche di gioco è assente, la probabilità di voto pesa il 65% e la media voto pesa il 35%. La media voto è riportata su una scala da 0 a 100 fra 4 e 8. Se manca, la probabilità di voto viene riscalata e la copertura resta al 65%. La fantamedia alimenta il punteggio atteso. Partite a voto, voto e fantavoto sono distinti da presenze, minuti e statistiche di gioco.
+
+Le segnalazioni manuali valgono per la giornata indicata e hanno precedenza sulla fonte automatica. Indisponibilità e squalifica azzerano l’impiego, il dubbio lo riduce del 25% e la diffida ha valore informativo. Il backup include segnalazioni e formazioni di riferimento. L’annullamento dell’ultima modifica per giornata vale durante la sessione.
 
 ## Previsione 1X2
 
-Il Match Center stima i gol di casa e trasferta dai risultati precedenti al giorno italiano della partita. Combina produzione offensiva della squadra e gol concessi dall’avversaria sul rispettivo campo. Le medie di campionato attenuano l’effetto dei piccoli campioni. Le gare 2025/26 di ogni squadra contribuiscono con un peso massimo di quattro partite equivalenti per campo. Le probabilità 1X2 si calcolano combinando due distribuzioni di Poisson. **Analisi** confronta Brier multicategoria e log loss con un Poisson basato sulle sole medie casa e trasferta di campionato.
+Il Match Center stima i gol di casa e trasferta dai risultati precedenti al giorno italiano della partita. Combina attacco e difesa sul rispettivo campo e mostra il rapporto fra le medie gol casa e trasferta. Le gare 2025/26 contribuiscono fino a quattro partite equivalenti per squadra e campo. La correzione Dixon–Coles ripesa 0–0, 0–1, 1–0 e 1–1. Si attiva dopo almeno 50 gare di confronto, quando riduce sia Brier sia log loss rispetto al Poisson per squadra. **Analisi** confronta i due modelli e il Poisson di campionato. [Dixon e Coles](https://doi.org/10.1111/1467-9876.00065)
 
 ## Simulazione Monte Carlo
 
-Per ogni prova il simulatore estrae l’impiego di ciascun giocatore. Quando sono disponibili le titolarità, divide le presenze in due profili di minutaggio, da titolare e da subentrato. Estrae gol, assist e gol subiti da distribuzioni di Poisson con frequenze proporzionali ai minuti simulati. Assume indipendenza tra giocatori. I percentili P10, P50 e P90 sono ricavati dalla distribuzione dei punteggi delle prove. Lo stesso seme riproduce i risultati a parità di archivio, giornata e formazione.
+Per ogni prova il simulatore estrae l’impiego. Quando il Match Center stima la partita, estrae un punteggio comune e attribuisce gol e assist ai calciatori in base al minutaggio e alle frequenze. Parte degli eventi può spettare al resto della squadra. Le reti subite del portiere derivano dallo stesso punteggio, ponderate per la presenza in campo. Il flag rigorista aumenta il peso di assegnazione dei rigori segnati dove il tasso è acquisito. Se il punteggio comune manca, la simulazione usa frequenze individuali indipendenti. I percentili P10, P50 e P90 sono ricavati dalle prove riproducibili a parità di input e seme.
+
+Il suggeritore massimizza la somma delle stime individuali degli undici titolari. Usa una sola base di punteggio e ordina la panchina per punti attesi. La stima del suggeritore è precedente alle sostituzioni e alle correlazioni della simulazione. Il confronto tra formazioni usa invece due simulazioni con gli stessi dati e lo stesso limite di cambi.
+
+**Rendimento** confronta le previsioni salvate prima della giornata con i fantavoti osservati. Una riga senza voto esplicita può attivare una sostituzione. Una riga mancante resta ignota. Lo scarto viene mostrato quando il totale è risolvibile e le fonti di punteggio sono confrontabili.
 
 Le riserve vengono provate nell’ordine impostato dall’utente. Ciascuna può sostituire un titolare senza presenza simulata dello stesso ruolo, fino al limite di sostituzioni. Quando mancano dati per un titolare, il risultato indica copertura parziale e mostra il giocatore tra gli esclusi. Il calcolo di una giornata richiede un incontro verificato per ogni giocatore incluso. Le proiezioni riguardano le partite da giocare e usano le statistiche disponibili alla data dell’archivio.
 

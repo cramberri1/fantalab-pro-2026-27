@@ -36,7 +36,7 @@ Il documento JSON contiene `season` uguale a `2026/27`, `source` e le eventuali 
 
 | Lista | Chiave | Campi supportati |
 |---|---|---|
-| `players` | `id` | `appearances`, `starts`, `minutes`, `goals`, `assists`, `shots`, `yellowCards`, `xg`, `xa`, `npxg`, `history` |
+| `players` | `id` | `appearances`, `starts`, `minutes`, `goals`, `assists`, `shots`, `yellowCards`, `redCards`, `penaltiesScored`, `penaltiesMissed`, `penaltiesSaved`, `ownGoals`, `xg`, `xa`, `npxg`, `history` |
 | `players[].history` | `fixtureId` | `minutes`, `goals`, `assists`, `xg`, `xa` |
 | `fixtures` | `id` | `homeXg`, `awayXg` per risultati finali già acquisiti |
 | `absences` | `playerId`, `fixtureId`, `teamId` | `status` (`out`, `doubtful`, `reported`), `reason` facoltativo |

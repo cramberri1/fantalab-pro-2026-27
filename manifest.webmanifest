@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "FantaLab Pro · Serie A 2026/27",
+  "short_name": "FantaLab Pro",
+  "description": "Statistiche, Match Center e formazioni per il fantacalcio della Serie A.",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c1010",
+  "theme_color": "#0c1010",
+  "icons": [
+    { "src": "assets/mark-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/mark-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
