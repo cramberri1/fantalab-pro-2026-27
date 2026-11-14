@@ -8,8 +8,7 @@ const MAX_RHO_HUNDREDTHS = 18;
 
 function matchDay(fixture) {
   if (!fixture?.homeId || !fixture.awayId || fixture.homeId === fixture.awayId) return null;
-  const day = fixtureCalendarDay(fixture);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day ?? '') ? day : null;
+  return fixtureCalendarDay(fixture);
 }
 
 function completedGames(fixtures, archive = false) {
@@ -170,7 +169,6 @@ function evaluateModels(current, prior, cutoff = '9999-12-31') {
   const priorByDay = new Map();
   const currentByDay = new Map();
   const observations = [];
-  const fitted = new Map();
   for (const game of prior) {
     if (game.day >= cutoff) continue;
     const rates = ratesForMatch(game.fixture, game.day, prior, [], priorByDay);
@@ -181,6 +179,13 @@ function evaluateModels(current, prior, cutoff = '9999-12-31') {
   const model = { brier: 0, logLoss: 0 };
   const baseline = { brier: 0, logLoss: 0 };
   const dixonColes = { brier: 0, logLoss: 0 };
+  const replay = { brier: 0, logLoss: 0 };
+  let replayDixonColesMatches = 0;
+  let fittedDay;
+  let rho = null;
+  let useCorrection = false;
+  const preferDixonColes = () => dixonColesMatches >= MIN_DIXON_COLES_SAMPLE && dixonColes.brier < model.brier
+    && dixonColes.logLoss < model.logLoss;
   const games = current.filter(game => game.day < cutoff).sort((a, b) => a.day.localeCompare(b.day));
   for (const game of games) {
     const { fixture, day } = game;
@@ -190,27 +195,31 @@ function evaluateModels(current, prior, cutoff = '9999-12-31') {
     const mass = threeWayMass(homeRate, awayRate);
     const original = normalize(mass);
     const observation = matchObservation(game, rates);
-    if (!fitted.has(day)) fitted.set(day, fitDixonColes(observations, day));
-    const rho = fitted.get(day);
+    if (day !== fittedDay) {
+      fittedDay = day;
+      rho = fitDixonColes(observations, day);
+      useCorrection = rho !== null && preferDixonColes();
+    }
     const corrected = rho === null ? original
       : correctedProbabilities(mass, homeRate, awayRate, feasibleRho(rho, homeRate, awayRate));
     accumulate(model, original, observation.outcome);
     accumulate(baseline, normalize(threeWayMass(leagueHomeRate, leagueAwayRate)), observation.outcome);
     accumulate(dixonColes, corrected, observation.outcome);
+    accumulate(replay, useCorrection ? corrected : original, observation.outcome);
     observations.push(observation);
     if (rho !== null) dixonColesMatches++;
+    if (useCorrection) replayDixonColesMatches++;
     matches++;
   }
   const average = loss => ({
     brier: matches ? loss.brier / matches : null,
     logLoss: matches ? loss.logLoss / matches : null
   });
-  const selectedModel = dixonColesMatches >= MIN_DIXON_COLES_SAMPLE && dixonColes.brier < model.brier
-    && dixonColes.logLoss < model.logLoss ? 'dixon-coles' : 'poisson';
   return {
     matches, dixonColesMatches, model: average(model), baseline: average(baseline),
     dixonColes: dixonColesMatches ? average(dixonColes) : { brier: null, logLoss: null },
-    selectedModel, observations
+    replay: { ...average(replay), dixonColesMatches: replayDixonColesMatches },
+    selectedModel: preferDixonColes() ? 'dixon-coles' : 'poisson', observations
   };
 }
 

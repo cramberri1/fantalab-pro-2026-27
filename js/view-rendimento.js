@@ -13,7 +13,7 @@ export function renderRendimento({
       const result = evaluateLineupPerformance(forecast, (player, day, season) => mode === 'real' ? realizedVote(player, day, season, basis) : undefined);
       return `<section class="panel stacked"><h2>Giornata ${forecast.round}</h2>
         <p>${html(projectionLabel(result.method))} · ${html(date(forecast.asOf))} · copertura previsione ${percent(result.expectedCoverage)}.</p>
-        <div class="detail-grid">${stat('Fantapunti attesi',number(result.expectedPoints,2))}${stat('Fantapunti reali',number(result.actualPoints,2))}
+        <div class="detail-grid">${stat('Fantapunti attesi',number(result.expectedPoints,2))}${stat('Fantapunti dai voti',number(result.actualPoints,2))}
         ${stat('Scarto reale − attesi',number(result.difference,2))}${stat('Posti verificati',`${result.coverage.known}/${result.coverage.total}`)}</div>
         <p class="muted">${result.source ? `Fonte voti · ${html(result.source)}. ` : ''}${html(result.reason)}</p>
         <details><summary>Rendimento dei calciatori</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Rendimento individuale G${forecast.round}">

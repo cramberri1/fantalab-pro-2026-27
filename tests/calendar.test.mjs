@@ -26,6 +26,13 @@ test('uses Italian local dates and avoids offering an elapsed kickoff', () => {
   assert.equal(isPendingFixture(game(12, 'unknown', '2026-11-14'), now), false);
 });
 
+test('uses a civil date without a kickoff only when the date actually exists', () => {
+  assert.equal(fixtureCalendarDay(game(12, 'scheduled', '2026-11-31')), null);
+  assert.equal(fixtureCalendarDay(game(12, 'scheduled', '2026-02-29')), null);
+  assert.equal(fixtureCalendarDay(game(12, 'scheduled', '2028-02-29')), '2028-02-29');
+  assert.equal(fixtureCalendarDay(game(12, 'scheduled', '2026-11-13T15:00:00Z')), null);
+});
+
 test('retains a live or partly played round while displaying the previous round', () => {
   const data = makeDataset([
     game(11, 'played', '2026-11-08'),

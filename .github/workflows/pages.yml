@@ -31,12 +31,21 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Prepara Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
       - name: Configura GitHub Pages
         uses: actions/configure-pages@v5
       - name: Verifica pipeline e snapshot
         run: |
           python -m unittest discover -s tests -p 'test_*.py'
           python tools/update_data.py --validate-only data/serie-a-2026-27.json
+      - name: Verifica importatori, modelli e build offline
+        run: |
+          node --test tests/*.test.mjs
+          node tools/build_offline.mjs "$RUNNER_TEMP/FantaLab-Pro.html"
       - name: Aggiorna i dati dalle fonti configurate
         env:
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}

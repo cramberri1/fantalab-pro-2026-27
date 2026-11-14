@@ -13,6 +13,7 @@ export function renderMercato({
       ${coverage.roster ? `<span>Rosa collegata ${number(coverage.matchedRoster)}/${number(coverage.roster)}</span>` : ''}
       ${marketImports.svincolati ? `<span>${number(coverage.eligibleFreeAgents)} svincolati candidabili</span><span>${number(coverage.unscoredFreeAgents)} senza indice</span>` : ''}
       ${coverage.conflictingFreeAgents ? `<span>${number(coverage.conflictingFreeAgents)} righe discordanti escluse</span>` : ''}
+      <span>Stima di giornata per ${number(coverage.fixtureProjections)}/${number(coverage.catalog)} profili</span>
     </div>` : ''}
     ${marketNotice ? `<p class="notice neutral" role="status">${html(marketNotice)}</p>` : ''}
     <section class="panel market-workbench">

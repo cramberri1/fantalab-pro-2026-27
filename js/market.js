@@ -112,7 +112,7 @@ function makeProfile(record, source, freeRecord, conflict) {
     fantasyAverage: appearances > 0 ? observed(row.fantasyAverage) : null,
     adjustedFantasy: null, baselineFantasy: null, score: null, components: { quality: null, volume: null },
     confidence: appearances === null ? null : appearances / (appearances + PRIOR_MATCHES),
-    expectedPoints: null, fixture: null, absenceStatus: null
+    expectedPoints: null, fixture: null, absenceStatus: null, projectionBasis: null
   };
 }
 
@@ -159,6 +159,14 @@ function attachProjection(profile, publicPlayers, dataset, round, analyze) {
   profile.expectedPoints = marketNumber(analysis.expectedPoints) ? analysis.expectedPoints : null;
   profile.fixture = analysis.fixture;
   profile.absenceStatus = analysis.availability?.status ?? null;
+  const { method, sample } = analysis.projection ?? {};
+  if (profile.expectedPoints !== null && method && Number.isInteger(analysis.fixture.round)) {
+    profile.projectionBasis = {
+      method, round: analysis.fixture.round, source: sample?.sourceId ?? sample?.source ?? null,
+      sample: Number.isInteger(sample?.votes) && Number.isInteger(sample.observations)
+        ? { votes: sample.votes, observations: sample.observations } : null
+    };
+  }
   return profile;
 }
 
@@ -264,13 +272,24 @@ export function buildMarket({ listone, freeAgents, roster = [], dataset, round, 
   const notes = [
     'Indice mercato storico: 65% fantamedia corretta verso la media di ruolo e 35% partite a voto rispetto al massimo osservato.',
     'La correzione della fantamedia pesa la media di ruolo quanto sei gare. Servono almeno tre gare a voto per lato e cinque punti di differenza per indicare un miglioramento.',
-    'Quotazione e FVM sono riferimenti del file. Le proiezioni FantaLab, quando disponibili, sono mostrate a parte.'
+    'Le stime di giornata usano le stesse fonti delle schede calciatore. La differenza in fantapunti richiede una base comune per la stessa giornata.'
   ];
   return { catalog, roster: profiles, freeAgents: eligible, coverage, notes, excludedKeys };
 }
 
 function difference(incoming, outgoing) {
   return marketNumber(incoming) && marketNumber(outgoing) ? incoming - outgoing : null;
+}
+
+function compareProjectionBasis(outgoing, incoming) {
+  const from = outgoing.projectionBasis;
+  const to = incoming.projectionBasis;
+  if (!from || !to || from.round !== to.round) return null;
+  const fromAbsent = from.method === 'confirmed-out';
+  const toAbsent = to.method === 'confirmed-out';
+  if (!fromAbsent && !toAbsent && (from.method !== to.method || from.source !== to.source)) return null;
+  return { method: fromAbsent ? to.method : from.method, round: from.round,
+    outgoingSample: from.sample, incomingSample: to.sample };
 }
 
 function comparisonReason(outgoing, incoming, signal) {
@@ -285,12 +304,14 @@ function comparisonReason(outgoing, incoming, signal) {
 }
 
 function comparison(outgoing, incoming, creditDifference = null) {
+  const projectionComparison = compareProjectionBasis(outgoing, incoming);
+  const projectionMismatch = Boolean(outgoing.projectionBasis && incoming.projectionBasis && !projectionComparison);
   const delta = {
     score: difference(incoming.score, outgoing.score),
     fantasyAverage: difference(incoming.fantasyAverage, outgoing.fantasyAverage),
     adjustedFantasy: difference(incoming.adjustedFantasy, outgoing.adjustedFantasy),
     appearances: difference(incoming.appearances, outgoing.appearances),
-    expectedPoints: difference(incoming.expectedPoints, outgoing.expectedPoints),
+    expectedPoints: projectionComparison ? difference(incoming.expectedPoints, outgoing.expectedPoints) : null,
     referencePrice: difference(incoming.price, outgoing.price)
   };
   let signal = 'insufficient';
@@ -302,6 +323,7 @@ function comparison(outgoing, incoming, creditDifference = null) {
   }
   return {
     ok: true, reason: comparisonReason(outgoing, incoming, signal), outgoing, incoming, delta, signal,
+    projectionComparison, projectionMismatch,
     creditDifference: marketNumber(creditDifference) ? creditDifference : null
   };
 }

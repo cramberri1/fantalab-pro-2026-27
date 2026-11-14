@@ -1020,19 +1020,28 @@ async function updateOfficialArchive(next) {
   }
   invalidateLineupResults();
 }
-function officialBinding(season) {
-  const players = [...dataset.players,...Object.values(modeState().rosterLocals)];
-  const teams = season === dataset.season ? dataset.teams : historicalArchive?.teams;
+function officialBindingContext() {
+  return {
+    current:dataset,
+    players:[...dataset.players,...Object.values(storage.real.rosterLocals ?? {})],
+    listone:marketImports.listone?.rows
+  };
+}
+function officialBinding(season, { current, players, listone } = officialBindingContext()) {
+  const currentSeason = season === current.season;
+  const teams = currentSeason ? current.teams : historicalArchive?.teams;
   if (!teams?.length) throw new Error('Archivio delle squadre della stagione precedente non disponibile.');
-  return { teams, players, listone:season === dataset.season ? marketImports.listone?.rows : [] };
+  return { teams, players, listone:currentSeason ? listone : [] };
 }
 async function importOfficialFiles(files, confirmedSeason) {
-  if (!officialLoaded || officialBusy || !files.length) return;
+  if (mode !== 'real' || !officialLoaded || officialBusy || !files.length) return;
   if (files.length > 38) {
     officialMessage = 'Carica al massimo 38 file alla volta.';
     refreshOfficialPanel();
     return;
   }
+  const binding = officialBindingContext();
+  const currentSeason = binding.current.season;
   officialBusy = true;
   officialPending = undefined;
   officialMessage = 'Lettura dei file nel browser…';
@@ -1047,12 +1056,12 @@ async function importOfficialFiles(files, confirmedSeason) {
       try {
         if (!/\.xlsx$/i.test(file.name) || file.size > 8_000_000) throw new Error('Usa un file XLSX fino a 8 MB.');
         const detected = officialVotesSeason(file.name);
-        if (!confirmedSeason && detected !== dataset.season) { pending.push(file); continue; }
-        const season = confirmedSeason ?? dataset.season;
+        if (!confirmedSeason && detected !== currentSeason) { pending.push(file); continue; }
+        const season = confirmedSeason ?? currentSeason;
         if (detected && detected !== season) throw new Error(`Il nome del file indica la stagione ${detected}. Conferma la stagione corrispondente.`);
-        if (season !== dataset.season) await loadHistoricalArchive();
+        if (season !== currentSeason) await loadHistoricalArchive();
         const day = await readOfficialVotesWorkbook(await file.arrayBuffer(), {
-          filename:file.name, season:dataset.season, confirmedSeason, ...officialBinding(season)
+          filename:file.name, season:currentSeason, confirmedSeason, ...officialBinding(season,binding)
         });
         const key = `${day.season}:${day.round}`;
         if (days.has(key)) replaced++;
@@ -1369,9 +1378,10 @@ function saveMarketSource(kind, source) {
   } catch { return false; }
 }
 function getMarket() {
-  const roster = modeState().roster;
-  const rosterKey = roster.join('\0');
-  if (marketCache?.dataset === dataset && marketCache.round === round && marketCache.rosterKey === rosterKey) {
+  const { roster, scoring, penaltyTakers } = modeState();
+  const inputs = [dataset, round, roster.join('\0'), marketImports.listone, marketImports.svincolati,
+    officialArchive, votesByPlayer, scoring, penaltyTakers.join('\0'), JSON.stringify([...roundAvailability()]), Math.floor(Date.now() / 60000)];
+  if (marketCache?.inputs.every((value, index) => value === inputs[index])) {
     return marketCache.result;
   }
   const result = buildMarket({
@@ -1379,9 +1389,9 @@ function getMarket() {
     freeAgents: marketImports.svincolati?.rows ?? [],
     roster: groupPlayers(roster),
     dataset, round,
-    analyze: player => analyzePlayer(player, { dataset, round, mode })
+    analyze: player => playerAnalysis(player)
   });
-  marketCache = { dataset, round, rosterKey, result };
+  marketCache = { inputs, result };
   return result;
 }
 function leagueStats() {
@@ -1495,9 +1505,11 @@ function marketCard(result, trade = false) {
   const { outgoing, incoming, delta, signal } = result;
   const [label, tone] = MARKET_SIGNALS[signal] ?? MARKET_SIGNALS.insufficient;
   const credit = result.creditDifference;
+  const projection = result.projectionComparison;
+  const voteSample = sample => sample ? ` · ${number(sample.votes)}/${number(sample.observations)} a voto` : '';
   return `<article class="market-comparison">
     <div class="panel-head"><h3><span class="muted">${html(outgoing.name)}</span> <span aria-label="in cambio di">→</span> ${html(incoming.name)}</h3>${status(label, tone)}</div>
-    <div class="market-facts"><span>Indice ${marketDelta(delta.score)} pt</span><span>FM corretta ${marketDelta(delta.adjustedFantasy,2)}</span><span>Partite a voto ${marketDelta(delta.appearances)}</span>${Number.isFinite(delta.expectedPoints) ? `<span>Fantapunti attesi ${marketDelta(delta.expectedPoints,2)}</span>` : ''}</div>
+    <div class="market-facts"><span>Indice ${marketDelta(delta.score)} pt</span><span>FM corretta ${marketDelta(delta.adjustedFantasy,2)}</span><span>Partite a voto ${marketDelta(delta.appearances)}</span>${projection ? `<span>Fantapunti attesi G${number(projection.round)} ${marketDelta(delta.expectedPoints,2)}</span>` : ''}</div>
     <p>${html(ROLES[incoming.position] ?? 'Ruolo mancante')} · ${html(marketClub(incoming))} · FM ${number(incoming.fantasyAverage,2)} su ${number(incoming.appearances)} voti · quotazione ${number(incoming.price)}</p>
     ${trade && Number.isFinite(credit) ? `<p>Conguaglio indicato · ${credit === 0 ? 'nessuno' : `${number(Math.abs(credit))} crediti ${credit > 0 ? 'a tuo carico' : 'in entrata'}`}</p>` : ''}
     <details><summary>Come si confrontano</summary><div class="table-wrap"><table>
@@ -1509,7 +1521,9 @@ function marketCard(result, trade = false) {
           ['Partite a voto',outgoing.appearances,incoming.appearances,0],['Quotazione',outgoing.price,incoming.price,0],
           ['Costo storico',outgoing.cost,incoming.cost,0]]
           .map(([name,before,after,digits]) => `<tr><th scope="row">${name}</th><td class="numeric">${number(before,digits)}</td><td class="numeric">${number(after,digits)}</td></tr>`).join('')}
+        ${projection ? `<tr><th scope="row">Fantapunti attesi G${number(projection.round)}<br><small>${html(projectionLabel(projection.method))}</small></th><td class="numeric">${number(outgoing.expectedPoints,2)}${voteSample(projection.outgoingSample)}</td><td class="numeric">${number(incoming.expectedPoints,2)}${voteSample(projection.incomingSample)}</td></tr>` : ''}
       </tbody></table></div>
+      ${result.projectionMismatch ? '<p>Le stime della giornata usano basi di punteggio diverse.</p>' : ''}
       <p>${html(result.reason ?? '')}</p>
     </details>
   </article>`;
@@ -1621,7 +1635,8 @@ async function importMarketFile(kind, file) {
 
 
 async function loadHistoricalArchive() {
-  if (historicalArchive || historicalRequest || historicalError) return;
+  if (historicalRequest) return historicalRequest;
+  if (historicalArchive || historicalError) return;
   historicalRequest = (async () => {
     try {
       const inline = document.getElementById('data-history');
@@ -1734,6 +1749,18 @@ function wireEvents() {
     if (Object.hasOwn(PAGES, hash) || !hash) setPage(currentPage());
   });
   window.addEventListener('storage', event => {
+    if (event.key === KEY) {
+      const next = readStorage();
+      const changedModes = ['real', 'demo'].filter(kind => JSON.stringify(storage[kind]) !== JSON.stringify(next[kind]));
+      storage = next;
+      for (const kind of changedModes) lineupUndo[kind].clear();
+      if (changedModes.includes(mode)) {
+        lineupCopyPreview = false;
+        invalidateLineupResults();
+        if (dataset) renderLineupChange();
+      }
+      return;
+    }
     if (event.key === VOTES_KEY) {
       votesImport = readVotesImport();
       votesByPlayer = indexVotes(votesImport);
@@ -1950,7 +1977,10 @@ function wireEvents() {
       const asOfRound = completeRounds().includes(day) ? day : undefined;
       const saved = saveMarketSource('listone', { ...marketImports.listone, asOfRound });
       invalidateLineupResults();
+      render();
+      $('#market-as-of-round')?.focus({preventScroll:true});
       if (!saved) notify('Il browser non ha salvato la giornata del listone.');
+      return;
     }
     if (marketFilter) {
       marketFilters[marketFilter] = value;

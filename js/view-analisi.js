@@ -48,10 +48,11 @@ export function renderAnalisi({
     <div class="split overview-rounds">${votesPanel()}
       <section class="panel"><h2>Verifica retrospettiva 1X2</h2>
         ${validation?.matches ? `<p>${number(validation.matches)} partite 2026/27. Per ogni partita il modello usa soltanto risultati dei giorni precedenti. Il riferimento usa le medie casa e trasferta di Serie A.</p>
+        <p>I primi tre punteggi valutano i singoli metodi. La replica applica per ogni partita il metodo che FantaLab avrebbe scelto prima del calcio d’inizio.</p>
         <div class="table-wrap"><table><thead><tr><th>Metodo</th><th>Brier</th><th>Log loss</th></tr></thead><tbody>
-        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes]].map(([label, scores]) =>
+        ${[['Poisson campionato',validation.baseline],['Poisson per squadra',validation.model],['Dixon–Coles',validation.dixonColes],['Replica della scelta prepartita',validation.replay]].map(([label, scores]) =>
           `<tr><th scope="row">${label}</th><td>${number(scores?.brier,4)}</td><td>${number(scores?.logLoss,4)}</td></tr>`).join('')}</tbody></table></div>
-        <p>Modello scelto · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. Correzione valutata su ${number(validation.dixonColesMatches)} gare. Valori più bassi indicano previsioni migliori sul campione.</p>`
+        <p>Modello attuale · ${validation.selectedModel === 'dixon-coles' ? 'Dixon–Coles' : 'Poisson per squadra'}. La correzione si attiva dopo almeno 50 gare di confronto, se migliora entrambi i punteggi. Nel campione è stata valutata su ${number(validation.dixonColesMatches)} gare e usata per ${number(validation.replay.dixonColesMatches)} previsioni nella replica. Valori più bassi indicano previsioni migliori sul campione.</p>`
         : '<p>Verifica disponibile con l’archivio della stagione precedente e risultati acquisiti.</p>'}</section>
     </div>`;
 }

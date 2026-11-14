@@ -12,7 +12,7 @@ const row = (person, rating, starred = false, events = {}) => ({
   ...person, votes: { Fantacalcio: [rating, starred], Statistico: [rating + 0.5, starred], Italia: [rating, starred] },
   events: { ...zeroEvents, ...events }
 });
-const day = (round, rows, extra = {}) => ({ season, round, teamIds: ['alfa', 'beta'], complete: false, unmatched: [], rows, ...extra });
+const day = (round, rows, extra = {}) => ({ season, round, teamIds: ['alfa', 'beta'], complete: true, unmatched: [], rows, ...extra });
 const match = (round, status = 'played', date = `2026-09-${String(round * 3).padStart(2, '0')}`) =>
   ({ round, homeId: 'alfa', awayId: 'beta', status, date });
 
@@ -37,6 +37,7 @@ test('An observed team distinguishes no vote, missing group, ambiguous match, an
     day(5, []),
     day(6, [row(player, 7), row(sameClubPlayer, 6.5)]),
     day(7, [], { unmatched: [{ teamId: 'alfa', position: 'DEF', candidateIds: [] }] }),
+    day(8, [row(player, 6)], { complete: false }),
   ]);
   assert.equal(archive.record(player, season, 1), undefined);
   assert.equal(archive.record(player, season, 2), undefined);
@@ -47,6 +48,8 @@ test('An observed team distinguishes no vote, missing group, ambiguous match, an
   assert.equal(archive.record(player, season, 7), undefined);
   assert.equal(archive.record(sameClubPlayer, season, 5), undefined);
   assert.equal(archive.record(sameClubPlayer, season, 7).fantasyRating, null);
+  assert.equal(archive.record(player, season, 8).fantasyRating, 6);
+  assert.equal(archive.record(sameClubPlayer, season, 8), undefined);
   const sameSeasonTransfer = buildOfficialVoteIndex([day(4, [row(oldPlayer, 6)]), day(5, [])]);
   assert.equal(sameSeasonTransfer.record(player, season, 5), undefined);
 });

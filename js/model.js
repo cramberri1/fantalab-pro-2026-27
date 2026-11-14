@@ -855,6 +855,9 @@ export function simulateLineup(starters, options = {}) {
   ] : [
     'Stima basata sui fantavoti FantaTB pubblicati prima della partita. Ogni giocatore estrae un fantavoto osservato, oppure non riceve voto in base alle registrazioni disponibili.',
   ];
+  if (scoring.defenseModifier && method !== 'events' && method !== 'official-history') {
+    notes.push('Modificatore difesa escluso. Questa base di punteggio non simula il voto base individuale.');
+  }
   if (method !== 'events') {
     const samples = [...eligibleStarters, ...eligibleReserves].flatMap((entry) => entry.analysis.projection.sample ?? []);
     const rounds = [...new Set(samples.flatMap((sample) => sample.rounds ?? [sample.asOfRound]))].sort((a, b) => a - b);

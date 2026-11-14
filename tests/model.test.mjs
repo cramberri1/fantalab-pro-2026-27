@@ -174,6 +174,9 @@ test('empirical simulation samples votes and historical scores reproducibly', ()
   assert.equal(run.min, 0);
   assert.equal(run.max, 10);
   assert.deepEqual(run, simulateLineup([fantasyOnly], options));
+  const withModifier = simulateLineup([fantasyOnly], { ...options, scoring: { defenseModifier: true } });
+  assert.equal(withModifier.mean, run.mean);
+  assert.ok(withModifier.notes.some(message => message.startsWith('Modificatore difesa escluso.')));
 });
 
 test('local league CSV takes precedence and uses only explicit current-season observations before the fixture', () => {

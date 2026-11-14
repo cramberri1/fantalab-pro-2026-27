@@ -64,7 +64,7 @@ export function renderLineupComparison({
       </div>
       ${result.difference === null ? `<p class="inline-status">${html(result.explanation)}</p>`
         : `<p class="inline-status"><strong>Differenza media (attuale − riferimento) · ${result.difference >= 0 ? '+' : ''}${number(result.difference, 2)} fantapunti</strong></p>`}
-      <p class="inline-status">Stessi dati, scenari, seed e limite cambi (${number(result.maxSubstitutions)}). Gli intervalli mostrano l’80% centrale degli scenari di ogni formazione.</p>` : ''}
+      <p class="inline-status">Stessi dati, numero di scenari, seed e limite cambi (${number(result.maxSubstitutions)}). Gli intervalli mostrano l’80% centrale degli scenari di ogni formazione.</p>` : ''}
     </div>
   </section>`;
 }

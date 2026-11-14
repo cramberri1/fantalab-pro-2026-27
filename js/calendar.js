@@ -10,7 +10,11 @@ function romeDay(date) {
 
 export function fixtureCalendarDay(fixture) {
   const kickoff = Date.parse(fixture.kickoff);
-  return Number.isFinite(kickoff) ? romeDay(kickoff) : fixture.date ?? null;
+  if (Number.isFinite(kickoff)) return romeDay(kickoff);
+  const day = fixture.date;
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const timestamp = Date.parse(`${day}T00:00:00Z`);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === day ? day : null;
 }
 
 export function isPendingFixture(fixture, now = new Date()) {

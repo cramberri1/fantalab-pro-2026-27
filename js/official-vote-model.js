@@ -158,7 +158,7 @@ export function buildOfficialVoteIndex(days, { edition = 'Fantacalcio', scoring 
       return { ...vote, fantasyRating: officialFantasyScore(row, edition, scoring), events: row.events,
         teamId: row.teamId, round, observed: true, source, sourceId };
     }
-    if (!entry.teams.has(player.teamId)) return undefined;
+    if (!entry.day.complete || !entry.teams.has(player.teamId)) return undefined;
     const teams = rosterEvidence.get(archiveKey(season, player.id));
     const firstAtCurrentTeam = teams?.get(player.teamId);
     if (firstAtCurrentTeam == null || firstAtCurrentTeam > round) return undefined;

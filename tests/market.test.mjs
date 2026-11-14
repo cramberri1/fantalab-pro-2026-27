@@ -93,3 +93,31 @@ test('keeps a confirmed zero fixture projection separate from the historical sco
   assert.equal(market.roster[0].score, baseline.roster[0].score);
   assert.equal(market.coverage.fixtureProjections, 1);
 });
+
+test('compares fixture points only on a common matchday and scoring basis', () => {
+  const incoming = { id: 'other', name: regular.name, teamId: 'verde', position: 'DEF' };
+  const options = { listone: [held, regular], freeAgents: [regular], roster,
+    dataset: { ...dataset, players: [...roster, incoming] } };
+  const projection = (method, sourceId, round = 12) => ({
+    expectedPoints: method === 'confirmed-out' ? 0 : 6,
+    fixture: { id: 'game', round },
+    projection: { method, sample: { sourceId, votes: 4, observations: 5 } }
+  });
+  const official = projection('official-history', 'fantacalcio-xlsx:Italia');
+  const find = analyze => rankMarketReplacements(buildMarket({ ...options, analyze }), 'roster:held').candidates[0];
+  const same = find(() => official);
+  assert.equal(same.delta.expectedPoints, 0);
+  assert.deepEqual(same.projectionComparison, {
+    method: 'official-history', round: 12, outgoingSample: { votes: 4, observations: 5 }, incomingSample: { votes: 4, observations: 5 }
+  });
+  for (const other of [projection('official-history', 'fantacalcio-xlsx:Statistico'),
+    projection('league-history', 'voti.csv'), projection('official-history', 'fantacalcio-xlsx:Italia', 13)]) {
+    const mixed = find(player => player.id === 'held' ? official : other);
+    assert.equal(mixed.delta.expectedPoints, null);
+    assert.equal(mixed.projectionMismatch, true);
+  }
+  const absence = find(player => player.id === 'held' ? projection('confirmed-out') : official);
+  assert.equal(absence.delta.expectedPoints, 6);
+  assert.equal(absence.projectionComparison.method, 'official-history');
+  assert.equal(absence.projectionMismatch, false);
+});

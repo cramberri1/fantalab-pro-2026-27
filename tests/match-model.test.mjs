@@ -41,7 +41,7 @@ test('requires enough prior results to score a fixture with or without an archiv
   assert.deepEqual(backtestMatches([completed]), {
     matches: 0, excluded: 1, dixonColesMatches: 0, selectedModel: 'poisson',
     model: { brier: null, logLoss: null }, baseline: { brier: null, logLoss: null },
-    dixonColes: { brier: null, logLoss: null }
+    dixonColes: { brier: null, logLoss: null }, replay: { brier: null, logLoss: null, dixonColesMatches: 0 }
   });
 });
 
@@ -93,6 +93,20 @@ test('requires enough prior evaluation and both metric improvements to choose Di
   assert.ok(afterEvidence.probabilities[1] > beforeEvidence.probabilities[1]);
   assert.ok(afterEvidence.probabilities.every(value => value > 0));
   assert.ok(Math.abs(afterEvidence.probabilities.reduce((sum, value) => sum + value, 0) - 1) < 1e-12);
+});
+
+test('replays the deployed selection and keeps decisions fixed across the threshold day', () => {
+  const sameDay = { ...draw, date: drawCurrent.at(-1).date, homeId: 'gamma' };
+  const nextDay = { ...draw, date: isoDay('2026-07-01', 50) };
+  const games = [...drawCurrent, sameDay, nextDay];
+  const report = backtestMatches(games, drawPrior);
+  const replayed = games.map(game => predictMatch(game, games, drawPrior));
+  assert.deepEqual(replayed.slice(-3).map(prediction => prediction.model), ['poisson', 'poisson', 'dixon-coles']);
+  assert.equal(report.replay.dixonColesMatches, 1);
+  const brier = replayed.reduce((sum, { probabilities: [home, draw, away] }) => sum + home ** 2 + (1 - draw) ** 2 + away ** 2, 0);
+  const logLoss = -replayed.reduce((sum, { probabilities }) => sum + Math.log(probabilities[1]), 0);
+  assert.ok(Math.abs(report.replay.brier - brier / games.length) < 1e-12);
+  assert.ok(Math.abs(report.replay.logLoss - logLoss / games.length) < 1e-12);
 });
 
 test('fit and model selection ignore later matches and all results on the Italian kickoff day', () => {

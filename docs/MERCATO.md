@@ -15,4 +15,4 @@ Il browser legge e salva localmente i dati utili all’analisi. Ricarica entramb
 
 L’indice confronta giocatori dello stesso ruolo. Il 65% misura la qualità della fantamedia, corretta verso la media del ruolo quando ci sono poche partite a voto. Il restante 35% misura il volume di partite a voto rispetto al massimo osservato nel listone. La correzione usa un peso equivalente a sei partite. Un miglioramento richiede almeno cinque punti di differenza nell’indice e almeno tre partite a voto per ciascun calciatore. Il confronto mostra la differenza di indice e segnala i campioni limitati.
 
-L’indice descrive i dati storici dell’export. Le eventuali proiezioni di giornata provengono dal modello FantaLab e compaiono a parte quando l’archivio del sito ha i dati necessari.
+L’indice descrive i dati storici dell’export. Le proiezioni di giornata usano le stesse fonti delle schede calciatore, comprese le importazioni personali e le indisponibilità manuali. Il confronto mostra la differenza in fantapunti quando le due stime hanno la stessa base di punteggio e si riferiscono alla stessa giornata.

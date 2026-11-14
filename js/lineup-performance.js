@@ -86,7 +86,7 @@ export function evaluateLineupPerformance(forecast, getVote) {
     coverage: { known, total: starters.length }, difference: canCompare ? actualPoints - expectedPoints : null,
     reason: actualPoints === null ? 'Mancano fantavoti o informazioni per determinare tutte le sostituzioni.'
       : expectedPoints === null ? 'Manca una previsione salvata.'
-      : !completeForecast ? 'La previsione salvata aveva copertura parziale.'
+      : !completeForecast ? 'La previsione salvata è verificabile solo in parte.'
       : !canCompare ? 'La previsione e i fantavoti acquisiti usano basi di punteggio diverse.'
       : null
   };
