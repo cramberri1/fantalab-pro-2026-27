@@ -1,0 +1,19 @@
+{
+  "season": "2026/27",
+  "source": {
+    "id": "verified-league-kickoffs",
+    "name": "Lega Serie A · Rettifica degli orari",
+    "url": "https://www.legaseriea.it/serie-a/news/anticipi-e-posticipi-fino-alla-fine-del-girone-di-andata",
+    "publishedDate": "2026-09-25",
+    "verifiedDate": "2026-11-14",
+    "confirmationUrl": "https://images.legaseriea.it/image/private/fl_attachment/prd/elpun6p9vavp24mpohx6.pdf",
+    "modifications": "Rettifiche puntuali verificate della 12ª giornata. Orari italiani."
+  },
+  "fixtures": [
+    {"fixtureId": "juventus-venezia", "round": 12, "homeId": "juventus", "awayId": "venezia", "replaces": "2026-11-23T20:45:00+01:00", "kickoff": "2026-11-22T12:30:00+01:00"},
+    {"fixtureId": "bologna-udinese", "round": 12, "homeId": "bologna", "awayId": "udinese", "replaces": "2026-11-22T18:00:00+01:00", "kickoff": "2026-11-22T15:00:00+01:00"},
+    {"fixtureId": "sassuolo-genoa", "round": 12, "homeId": "sassuolo", "awayId": "genoa", "replaces": "2026-11-22T12:30:00+01:00", "kickoff": "2026-11-22T15:00:00+01:00"},
+    {"fixtureId": "milan-frosinone", "round": 12, "homeId": "milan", "awayId": "frosinone", "replaces": "2026-11-22T15:00:00+01:00", "kickoff": "2026-11-22T18:00:00+01:00"},
+    {"fixtureId": "monza-fiorentina", "round": 12, "homeId": "monza", "awayId": "fiorentina", "replaces": "2026-11-23T18:30:00+01:00", "kickoff": "2026-11-23T20:45:00+01:00"}
+  ]
+}

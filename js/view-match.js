@@ -1,6 +1,6 @@
 export function renderMatch({
   dataset, round, selectedFixtureId, byRound, rounds, getRoundWindow, heading, fixtureList, matchCard,
-  renderFixtureDifficulty, difficultyGrid, html, number
+  renderFixtureDifficulty, difficultyGrid, roundAvailabilityPanel, html, number
 }) {
   const fixtures = byRound();
   const current = fixtures.find(f => f.id === selectedFixtureId) ?? fixtures[0];
@@ -19,5 +19,5 @@ export function renderMatch({
       <section class="panel"><div class="panel-head"><div><h2>Giornata ${round}</h2><p>Orari italiani quando disponibili</p></div><div class="actions"><button data-round="${allRounds[index - 1] ?? ''}" aria-label="Giornata precedente" ${index <= 0 ? 'disabled' : ''}>←</button>
         <button data-round="${allRounds[index + 1] ?? ''}" aria-label="Giornata successiva" ${index === allRounds.length - 1 ? 'disabled' : ''}>→</button></div></div>${fixtureList(fixtures, current?.id)}</section>
       <section class="panel" id="match-detail" aria-label="Dettaglio incontro">${matchCard(current)}</section>
-    </div><div id="fixture-difficulty">${renderFixtureDifficulty(difficultyGrid(), { html, number })}</div>`;
+    </div>${roundAvailabilityPanel(fixtures)}<div id="fixture-difficulty">${renderFixtureDifficulty(difficultyGrid(), { html, number })}</div>`;
 }

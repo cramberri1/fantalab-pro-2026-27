@@ -38,7 +38,8 @@ L’archivio unificato `data/serie-a-2026-27.json` collega squadre, partite, cal
 - 652 voci del listone TransferBeat del 1° ottobre e 1.416 voti FantaTB delle prime cinque giornate.
 - xG di squadra di calcio.it su 110 partite misurate, esposti con il loro campione.
 - Archivio Serie A 2025/26 con 380 risultati OpenFootball. La sezione **Analisi** confronta gol, punti e porte inviolate per partita, in casa e in trasferta. [Fonti per le due stagioni](docs/ANALISI.md).
-- La simulazione può usare i voti degli Excel di giornata, i fantavoti del CSV di lega, FantaTB o la fantamedia del listone Excel con giornata confermata. Lo storico di gioco individuale 2025/26 e le indisponibilità aggiornate richiedono un feed con copertura e diritti verificati.
+- La simulazione può usare i voti degli Excel di giornata, i fantavoti del CSV di lega, FantaTB o la fantamedia del listone Excel con giornata confermata. Lo storico pubblico 2025/26 copre calendario e risultati.
+- **Match Center** mostra per partita squalifiche della Lega, indisponibilità confermate e aggiornamenti su giocatori da verificare. Le segnalazioni sono aggiornate per la giornata verificata e riportano fonte e data. La copertura è parziale.
 
 [Fonti, licenze e copertura](docs/FONTI.md) · [Metodo e limiti del modello](docs/MODELLO.md)
 

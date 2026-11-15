@@ -452,6 +452,39 @@ function teamSeasonXg(fixture) {
     return `<p>${html(team.shortName)} · ${number(stats.xg,2)} xG${Number.isFinite(stats.xga) ? ` · ${number(stats.xga,2)} xGA` : ''}${Number.isFinite(stats.xgMatches) ? ` · ${number(stats.xgMatches)} partite misurate` : ''}</p>`;
   }).join('')}<p>Totali dello snapshot stagionale. ${sourceLink(teams[0].stats.xgSource)}</p></div>`;
 }
+const AVAILABILITY_LABELS = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile',
+  reported: 'Da verificare', suspended: 'Squalificato', unknown: 'Stato sconosciuto' };
+function availabilityLabel(report) {
+  return report?.kind === 'suspension' ? AVAILABILITY_LABELS.suspended : AVAILABILITY_LABELS[report?.status] ?? AVAILABILITY_LABELS.unknown;
+}
+function availabilityAttribution(report) {
+  const references = Array.isArray(report?.references) && report.references.length ? report.references : [report];
+  const links = references.flatMap(reference => {
+    const href = safeUrl(reference?.sourceUrl);
+    return href ? [`<a href="${html(href)}" target="_blank" rel="noopener noreferrer">${html(reference.sourceName || 'Fonte della segnalazione')}</a>`] : [];
+  });
+  const link = links.join(' · ') || (report?.sourceId ? sourceLink(report.sourceId) : '');
+  return link ? `${link}${report.publishedAt ? ` · ${html(date(report.publishedAt))}` : ''}` : '';
+}
+function availabilityList(reports) {
+  return `<ul class="availability-list">${reports.map(report => {
+    const player = getPlayer(report.playerId);
+    const source = availabilityAttribution(report);
+    return `<li><strong>${html(player?.name ?? report.playerId)}</strong>${player ? ` <small>· ${html(getTeam(player.teamId)?.shortName)}</small>` : ''}
+      · ${html(availabilityLabel(report))}${report.reason ? ` · ${html(report.reason)}` : ''}${source ? `<br><small>${source}</small>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+function roundAvailabilityPanel(fixtures) {
+  if (mode !== 'real') return '';
+  const reports = new Map(fixtures.map(fixture => [fixture.id, []]));
+  for (const report of dataset.absences) reports.get(report.fixtureId)?.push(report);
+  const verified = fixtures.filter(fixture => reports.get(fixture.id).length);
+  if (!verified.length) return '';
+  const count = verified.reduce((total, fixture) => total + reports.get(fixture.id).length, 0);
+  return `<details class="panel round-availability"><summary>Indisponibilità della G${round} · ${number(count)} segnalazioni</summary>
+    <p>Fonti verificate su ${number(verified.length)} incontri. La disponibilità degli altri giocatori resta da verificare.</p>
+    ${verified.map(fixture => `<div class="duel"><h3>${html(getTeam(fixture.homeId)?.shortName)} – ${html(getTeam(fixture.awayId)?.shortName)}</h3>${availabilityList(reports.get(fixture.id))}</div>`).join('')}</details>`;
+}
 function matchCard(fixture) {
   if (!fixture) return empty('Seleziona un incontro.');
   const home = previousForm(fixture.homeId, fixture);
@@ -459,11 +492,11 @@ function matchCard(fixture) {
   const scheduled = fixture.status === 'scheduled' && (mode === 'demo' || isPendingFixture(fixture));
   const prediction = scheduled ? predictMatch(fixture, dataset.fixtures, mode === 'real' ? historicalArchive?.fixtures : []) : null;
   const odds = prediction?.probabilities;
+  const source = fixture.resultSourceId ?? fixture.kickoffSourceId;
   const rows = [['Difesa e portiere','defense','Produzione offensiva avversaria'],['Centrocampo','midfield','Equilibrio tra gol fatti e concessi dall’avversario'],['Attacco','attack','Gol concessi dall’avversario']];
   const absences = dataset.absences.filter(a => a.fixtureId === fixture.id);
-  const statusLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Stato mancante' };
   return `<div class="detail-header"><h2>${html(getTeam(fixture.homeId)?.shortName)} – ${html(getTeam(fixture.awayId)?.shortName)}</h2>${status(score(fixture), fixture.status === 'played' ? 'available' : 'missing')}</div>
-    <p>${html(matchTime(fixture))}${fixture.resultSourceId ? ` · ${sourceLink(fixture.resultSourceId)}` : ''}</p>
+    <p>${html(matchTime(fixture))}${source ? ` · ${sourceLink(source)}` : ''}</p>
     <div class="duel"><h3>Andamento prima della partita</h3><p>Casa · ${formSummary(home)}</p><p>Trasferta · ${formSummary(away)}</p>
       <p>xG / xGA a partita · casa ${number(home?.xg, 2)} / ${number(home?.xga, 2)} · trasferta ${number(away?.xg, 2)} / ${number(away?.xga, 2)}</p></div>
     ${teamSeasonXg(fixture)}
@@ -477,7 +510,7 @@ function matchCard(fixture) {
       ${prediction.goalCalibration?.applied ? `<p>Taratura dei gol attiva · fattore ${number(prediction.goalCalibration.multiplier,3)} · ${number(prediction.goalCalibration.evaluatedMatches)} partite di verifica.</p>` : ''}
       ${mode === 'real' ? '<a class="text-link" href="#analisi">Verifica retrospettiva del modello</a>' : ''}</div>`
       : scheduled ? empty('Risultati precedenti insufficienti per stimare le probabilità 1X2.') : ''}
-    <div class="duel"><h3>Indisponibilità segnalate</h3>${absences.length ? `<ul>${absences.map(a => `<li>${html(getPlayer(a.playerId)?.name ?? a.playerId)} · ${html(statusLabels[a.status] ?? 'Stato mancante')}${a.reason ? ` · ${html(a.reason)}` : ''}</li>`).join('')}</ul>`
+    <div class="duel"><h3>Indisponibilità segnalate</h3>${absences.length ? availabilityList(absences)
       : '<p>Nessuna segnalazione acquisita per questo incontro. La disponibilità dei singoli resta sconosciuta.</p>'}</div>
     <div class="duel"><h3>Analisi individuale</h3><p>Apri il listone di una squadra per vedere statistiche, disponibilità e indice per questa giornata.</p>
       <div class="actions"><button data-club="${html(fixture.homeId)}">${html(getTeam(fixture.homeId)?.shortName ?? 'Casa')}</button><button data-club="${html(fixture.awayId)}">${html(getTeam(fixture.awayId)?.shortName ?? 'Trasferta')}</button></div></div>`;
@@ -485,7 +518,7 @@ function matchCard(fixture) {
 function match() {
   return renderMatch({
     dataset, round, selectedFixtureId, byRound, rounds, getRoundWindow, heading, fixtureList, matchCard,
-    renderFixtureDifficulty, difficultyGrid, html, number
+    renderFixtureDifficulty, difficultyGrid, roundAvailabilityPanel, html, number
   });
 }
 function difficultyGrid() {
@@ -605,8 +638,7 @@ function showPlayer(id) {
   const ratingValues = votes.map(row => row.rating).filter(Number.isFinite);
   const fantasyValues = votes.map(row => row.fantasyRating).filter(Number.isFinite);
   const average = values => values.length ? values.reduce((sum,value) => sum + value,0) / values.length : null;
-  const availabilityLabels = { out: 'Indisponibile', doubtful: 'In dubbio', available: 'Disponibile', reported: 'Segnalata', unknown: 'Mancante' };
-  const availability = a.availability?.status ?? 'unknown';
+  const reportSource = availabilityAttribution(a.availability);
   const projected = a.projection;
   const components = a.components.filter(c => Number.isFinite(c.value));
   const added = modeState().roster.includes(p.id);
@@ -625,7 +657,7 @@ function showPlayer(id) {
       <div class="detail-grid">${stat('Partite a voto', number(excel.gamesWithVote))}${stat('Media voto', number(excel.averageRating, 2))}${stat('Fantamedia', number(excel.fantasyAverage, 2))}</div></section>` : ''}
     <div class="actions"><button data-add="${html(p.id)}" ${added ? 'disabled' : ''}>${added ? 'Nella tua rosa' : 'Aggiungi alla rosa'}</button></div>
     <section class="dialog-section"><h3>Schierabilità · Giornata ${round}</h3>
-      <p class="muted">${opponent ? `Avversaria · ${html(opponent.shortName)} · ` : ''}Disponibilità ${html(availabilityLabels[availability] ?? 'Mancante')}${a.availability?.source === 'manual' ? ' · inserita manualmente' : ''}${a.availability?.reason ? ` · ${html(a.availability.reason)}` : ''}</p>
+      <p class="muted">${opponent ? `${html(opponent.shortName)} · ` : ''}${html(availabilityLabel(a.availability))}${a.availability?.source === 'manual' ? ' · segnalazione manuale' : ''}${a.availability?.reason ? ` · ${html(a.availability.reason)}` : ''}${reportSource ? `<br>${reportSource}` : ''}</p>
       <div class="detail-grid">${stat('Indice / 100', number(a.index))}${stat('Copertura', percent(a.coverage))}
       ${stat(Number.isFinite(projected?.voteProbability) ? 'Prob. di voto' : 'Prob. di giocare', percent(projected?.voteProbability ?? projected?.appearanceProbability))}
       ${stat('Fantapunti attesi', number(a.expectedPoints, 2))}</div>
@@ -815,10 +847,10 @@ function lineupContextLabel(context, compact = false) {
   if (!context) return '';
   const { availability, fixtureLabel, opponentName, venue, manual } = context;
   const fixture = compact && opponentName && venue ? `${opponentName} · ${venue === 'Casa' ? 'C' : 'T'}` : fixtureLabel;
-  const manualLabel = lineupManualLabel(manual);
+  const manualLabel = availability.sourceId === 'serie-a-disciplinary' ? '' : lineupManualLabel(manual);
   const label = manualLabel ? `${manualLabel} · manuale` : compact && availability.status === 'unknown' ? 'Disp. da verificare' : availability.label;
   return `<small class="lineup-player-context" data-availability="${html(availability.status)}">
-    <span>${html(fixture)}</span><span class="${manualLabel ? 'lineup-manual' : ''}" title="${html(manual?.reason ?? availability.reason ?? availability.label)}">${html(label)}</span>${context.penaltyTaker ? '<span>Rigorista</span>' : ''}</small>`;
+    <span>${html(fixture)}</span><span class="${manualLabel ? 'lineup-manual' : ''}" title="${html([availability.reason ?? availability.label, availability.sourceName].filter(Boolean).join(' · '))}">${html(label)}</span>${context.penaltyTaker ? '<span>Rigorista</span>' : ''}</small>`;
 }
 function pitch(record, validation, context) {
   return `<div class="pitch" role="group" aria-label="Formazione ${html(record.formation)} sul campo">${['FWD', 'MID', 'DEF', 'GK'].map(role => {

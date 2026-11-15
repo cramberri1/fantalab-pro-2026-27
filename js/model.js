@@ -184,16 +184,22 @@ function fixtureProjection(player, fixture, completed) {
 }
 
 export function getAvailability(player, fixture, absences, manual) {
-  if (manual?.status === 'suspended' || manual?.status === 'out') {
-    return { status: 'out', reason: manual.reason || (manual.status === 'suspended' ? 'Squalificato' : 'Indisponibile'), multiplier: 0, source: 'manual' };
-  }
-  if (manual?.status === 'doubtful') return { status: 'doubtful', reason: manual.reason || 'In dubbio', multiplier: 0.75, source: 'manual' };
   const report = fixture && absences.find((item) => sameId(item.playerId, player.id) && sameId(item.fixtureId, fixture.id));
   const reported = statusKey(report?.status);
-  if (RULED_OUT.has(reported)) return { status: 'out', reason: report.reason || report.status, multiplier: 0 };
-  if (QUESTIONABLE.has(reported)) return { status: 'doubtful', reason: report.reason || report.status, multiplier: 0.75 };
-  if (CONFIRMED.has(reported)) return { status: 'available', reason: report.reason || report.status, multiplier: 1 };
-  if (reported) return { status: 'reported', reason: report.reason || report.status, multiplier: 1, fixtureSpecific: true };
+  const attribution = report ? { kind: report.kind, sourceId: report.sourceId, sourceName: report.sourceName,
+    sourceUrl: report.sourceUrl, publishedAt: report.publishedAt, references: report.references } : {};
+  if (reported === 'suspended' && report.sourceId === 'serie-a-disciplinary') {
+    return { ...attribution, status: 'out', reason: report.reason || 'Squalificato', multiplier: 0 };
+  }
+  if (manual?.status === 'suspended' || manual?.status === 'out') {
+    return { status: 'out', kind: manual.status === 'suspended' ? 'suspension' : undefined,
+      reason: manual.reason || (manual.status === 'suspended' ? 'Squalificato' : 'Indisponibile'), multiplier: 0, source: 'manual' };
+  }
+  if (manual?.status === 'doubtful') return { status: 'doubtful', reason: manual.reason || 'In dubbio', multiplier: 0.75, source: 'manual' };
+  if (RULED_OUT.has(reported)) return { ...attribution, status: 'out', reason: report.reason || report.status, multiplier: 0 };
+  if (QUESTIONABLE.has(reported)) return { ...attribution, status: 'doubtful', reason: report.reason || report.status, multiplier: 0.75 };
+  if (CONFIRMED.has(reported)) return { ...attribution, status: 'available', reason: report.reason || report.status, multiplier: 1 };
+  if (reported) return { ...attribution, status: 'reported', reason: report.reason || report.status, multiplier: 1, fixtureSpecific: true };
 
   const seasonStatus = statusKey(player.injuryStatus);
   const seasonReport = RULED_OUT.has(seasonStatus) || QUESTIONABLE.has(seasonStatus) || seasonStatus === 'reported';

@@ -40,8 +40,9 @@ export function buildLineupContext(players, {
       : 'Partita non acquisita';
     const upcoming = fixture && isUpcoming(fixture);
     const subject = upcoming ? player : { id: player.id };
-    const { status, reason } = getAvailability(subject, fixture, matchReports.get(String(fixture?.id)) ?? []);
-    const label = (upcoming ? AVAILABILITY[status] : PAST_REPORTS[status]) ?? AVAILABILITY.unknown;
-    return [player.id, { opponentName, venue, fixtureLabel, availability: { status, reason, label } }];
+    const availability = getAvailability(subject, fixture, matchReports.get(String(fixture?.id)) ?? []);
+    const label = availability.kind === 'suspension' ? (upcoming ? 'Squalificato' : 'Squalifica per la gara')
+      : (upcoming ? AVAILABILITY[availability.status] : PAST_REPORTS[availability.status]) ?? AVAILABILITY.unknown;
+    return [player.id, { opponentName, venue, fixtureLabel, availability: { ...availability, label } }];
   }));
 }

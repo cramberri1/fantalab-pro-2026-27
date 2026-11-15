@@ -25,6 +25,7 @@ ROSTER_CREDIT = 'https://transferbeat.com/fantacalcio/listone.html'
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / 'data' / 'serie-a-2026-27.json'
 TEAM_XG_SEED = ROOT / 'data' / 'calcioit-team-xg.json'
+VERIFIED_AVAILABILITY = ROOT / 'data' / 'verified-availability.json'
 CLUBS = {
     'AC Milan': ('milan', 'Milan'),
     'AC Monza': ('monza', 'Monza'),
@@ -224,6 +225,7 @@ def row_index(rows, label):
 
 def validate(snapshot):
     from ratings import validate_ratings
+    from verified_availability import SOURCE_IDS, STATUSES, report_date, report_hostname
 
     if (snapshot['schemaVersion'], snapshot['season'], snapshot['mode']) != (1, SEASON, 'real'):
         raise DataError('Schema, stagione o tipo di dati errati.')
@@ -283,8 +285,13 @@ def validate(snapshot):
         key = (row['playerId'], row['fixtureId'])
         if (key in seen_absences or row['playerId'] not in players or not fixture
                 or row['teamId'] not in (fixture['homeId'], fixture['awayId'])
-                or row['status'] not in ('out', 'doubtful', 'reported')):
+                or row['status'] not in STATUSES):
             raise DataError('Indisponibilità duplicata o senza riferimenti validi.')
+        if row.get('sourceId') in SOURCE_IDS:
+            if row['sourceId'] not in sources or players[row['playerId']]['teamId'] != row['teamId'] or fixture['status'] != 'scheduled':
+                raise DataError('Indisponibilità verificata fuori contesto.')
+            report_date(row.get('publishedAt'))
+            report_hostname(row.get('sourceUrl'))
         seen_absences.add(key)
 
 
@@ -321,6 +328,8 @@ def main():
     parser.add_argument('--calendar-only', action='store_true', help='Importa il solo calendario OpenFootball.')
     parser.add_argument('--output', type=Path, default=SNAPSHOT)
     parser.add_argument('--validate-only', type=Path, metavar='SNAPSHOT')
+    parser.add_argument('--availability-only', type=Path, metavar='SNAPSHOT', help='Aggiorna i riscontri di disponibilità senza rete.')
+    parser.add_argument('--availability-file', type=Path, help='File delle segnalazioni verificate. Il default usa data/verified-availability.json.')
     parser.add_argument('--with-api-football', action='store_true', help='Richiede API_FOOTBALL_KEY e API_FOOTBALL_PUBLISH_ALLOWED=true.')
     parser.add_argument('--with-metrics', action='store_true', help='Richiede FANTALAB_METRICS_FILE o FANTALAB_METRICS_URL e METRICS_PUBLISH_ALLOWED=true.')
     args = parser.parse_args()
@@ -330,31 +339,20 @@ def main():
             print('Snapshot Serie A valido.')
             return 0
         now = datetime.now(timezone.utc)
-        raw = args.openfootball_file.read_bytes() if args.openfootball_file else fetch(OPEN_URL)[0]
-        snapshot = make_snapshot(raw, now)
-        if not args.calendar_only:
-            from open_results import add_footballanalytics, add_verified_results
-            if args.footballanalytics_file or not args.openfootball_file:
-                result_raw = args.footballanalytics_file.read_bytes() if args.footballanalytics_file else None
-                add_footballanalytics(snapshot, now, result_raw)
-            add_verified_results(snapshot, now)
-            roster = args.roster_file.read_bytes() if args.roster_file else fetch(ROSTER_URL)[0]
-            add_roster(snapshot, roster, now)
-            from ratings import add_ratings
-            if args.roster_file and not args.ratings_dir:
-                print('Voti saltati. Usare --ratings-dir per aggiungere i file offline.')
-            else:
-                add_ratings(snapshot, now, args.ratings_dir)
-        if args.with_api_football or args.with_metrics:
-            from licensed import enrich_api_football, enrich_metrics
-            if args.with_api_football:
-                enrich_api_football(snapshot, now)
-            if args.with_metrics:
-                enrich_metrics(snapshot)
-        calculate_team_stats(snapshot)
-        if not args.calendar_only:
-            from calcioit_stats import apply_calcioit_team_xg
-            apply_calcioit_team_xg(snapshot, TEAM_XG_SEED.read_bytes())
+        from verified_kickoffs import apply_verified_kickoffs
+        if args.availability_only:
+            snapshot = decode(args.availability_only.read_bytes())
+            validate(snapshot)
+            apply_verified_kickoffs(snapshot)
+            snapshot['updatedAt'] = now.isoformat(timespec='seconds')
+        else:
+            snapshot = refresh_snapshot(args, now, apply_verified_kickoffs)
+        report_path = args.availability_file or VERIFIED_AVAILABILITY
+        if not args.calendar_only and (args.availability_file or report_path.is_file()):
+            from verified_availability import merge_reports
+            counts = merge_reports(snapshot, report_path.read_bytes(), now)
+            print(f"Disponibilità verificate. {counts['applied']} attive, {counts['unmatched']} senza abbinamento, "
+                  f"{counts['inactive']} fuori finestra, {counts['conflicts']} discordanti.")
         validate(snapshot)
         write_atomic(args.output, snapshot)
         print(f"Snapshot aggiornato. {len(snapshot['fixtures'])} partite, {len(snapshot['players'])} giocatori, {len(snapshot['absences'])} segnalazioni.")
@@ -363,6 +361,36 @@ def main():
         message = str(error) if isinstance(error, DataError) else type(error).__name__
         print(f'Aggiornamento interrotto. {message} Il file precedente resta disponibile.', file=sys.stderr)
         return 1
+
+
+def refresh_snapshot(args, now, apply_verified_kickoffs):
+    raw = args.openfootball_file.read_bytes() if args.openfootball_file else fetch(OPEN_URL)[0]
+    snapshot = make_snapshot(raw, now)
+    apply_verified_kickoffs(snapshot)
+    if not args.calendar_only:
+        from ratings import add_ratings
+        from open_results import add_footballanalytics, add_verified_results
+        if args.footballanalytics_file or not args.openfootball_file:
+            result_raw = args.footballanalytics_file.read_bytes() if args.footballanalytics_file else None
+            add_footballanalytics(snapshot, now, result_raw)
+        add_verified_results(snapshot, now)
+        roster = args.roster_file.read_bytes() if args.roster_file else fetch(ROSTER_URL)[0]
+        add_roster(snapshot, roster, now)
+        if args.roster_file and not args.ratings_dir:
+            print('Voti saltati. Usare --ratings-dir per aggiungere i file offline.')
+        else:
+            add_ratings(snapshot, now, args.ratings_dir)
+    if args.with_api_football or args.with_metrics:
+        from licensed import enrich_api_football, enrich_metrics
+        if args.with_api_football:
+            enrich_api_football(snapshot, now)
+        if args.with_metrics:
+            enrich_metrics(snapshot)
+    calculate_team_stats(snapshot)
+    if not args.calendar_only:
+        from calcioit_stats import apply_calcioit_team_xg
+        apply_calcioit_team_xg(snapshot, TEAM_XG_SEED.read_bytes())
+    return snapshot
 
 
 if __name__ == '__main__':

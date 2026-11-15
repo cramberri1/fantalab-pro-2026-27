@@ -38,7 +38,7 @@ L’app ricalcola localmente la verifica a ogni importazione, rimozione o modifi
 
 Con il metodo Excel, se l’indice da statistiche di gioco è assente, la probabilità di voto pesa il 65% e la media voto pesa il 35%. La media voto è riportata su una scala da 0 a 100 fra 4 e 8. Se manca, la probabilità di voto viene riscalata e la copertura resta al 65%. La fantamedia alimenta il punteggio atteso. Partite a voto, voto e fantavoto sono distinti da presenze, minuti e statistiche di gioco.
 
-Le segnalazioni manuali valgono per la giornata indicata e hanno precedenza sulla fonte automatica. Indisponibilità e squalifica azzerano l’impiego, il dubbio lo riduce del 25% e la diffida ha valore informativo. Il backup include segnalazioni e formazioni di riferimento. L’annullamento dell’ultima modifica per giornata vale durante la sessione.
+La squalifica verificata sul comunicato della Lega ha precedenza per la partita a cui si applica. Le segnalazioni manuali valgono per la giornata indicata e prevalgono sugli altri dati pubblici. Indisponibilità confermata e squalifica azzerano l’impiego. Il dubbio lo riduce del 25% come ipotesi del modello. Gli aggiornamenti da verificare e le diffide hanno valore informativo. Il backup include segnalazioni e formazioni di riferimento. L’annullamento dell’ultima modifica per giornata vale durante la sessione.
 
 ## Previsione 1X2
 

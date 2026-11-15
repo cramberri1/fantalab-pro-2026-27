@@ -20,6 +20,16 @@ python -m unittest discover -s tests -p 'test_*.py'
 
 Gli aggiornamenti locali con `--openfootball-file`, `--footballanalytics-file`, `--roster-file` e `--ratings-dir` usano file originali scaricati a parte. Per lavorare sul solo calendario usa `--calendar-only`. Su Windows, se Python non trova il fuso `Europe/Rome`, installa `tzdata` con `python -m pip install tzdata`.
 
+## Squalifiche e condizioni per partita
+
+Il workflow integra i singoli fatti verificati in `data/verified-availability.json`. Per ogni riga controlla ID, nome e squadra del giocatore, ID e giornata della partita, stato, data e link alla pubblicazione. Le squalifiche richiedono il comunicato ufficiale della Lega e una verifica della gara in cui si scontano. Eventuali rettifiche della Lega aggiornano la riga prima della pubblicazione. Per infortuni e recuperi si consultano club, federazione, convocazioni e notizie originali delle testate di settore. Un allenamento a parte può essere registrato come segnalazione informativa. Ogni turno richiede una nuova verifica delle fonti. Il workflow pubblica le segnalazioni abbinate alle gare ancora da giocare.
+
+Le variazioni verificate di data e orario sono in `data/verified-kickoffs.json`. Per aggiornare soltanto questi riscontri sullo snapshot locale, anche offline:
+
+```sh
+python tools/update_data.py --availability-only data/serie-a-2026-27.json --output data/serie-a-2026-27.json
+```
+
 ## API-Football
 
 In **Settings → Secrets and variables → Actions**, aggiungi il segreto `API_FOOTBALL_KEY` con la chiave diretta API-Sports. Imposta la variabile `API_FOOTBALL_PUBLISH_ALLOWED=true` quando il contratto copre il sito pubblico, l’uso fantasy e la pubblicazione dello snapshot sul browser. La variabile facoltativa `API_FOOTBALL_REQUEST_BUDGET` limita le richieste per esecuzione e vale 75 per impostazione predefinita.

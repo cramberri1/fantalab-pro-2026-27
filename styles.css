@@ -145,6 +145,11 @@ main { min-width: 0; }
 .detail-header + p { margin-bottom: 12px; }
 .duel { border-top: 1px solid var(--border); padding: 12px 0; }
 .duel > p { color: var(--muted); font-size: .82rem; margin-top: 5px; }
+.round-availability { margin: 14px 0; }
+.round-availability > p { margin-bottom: 12px; }
+.availability-list { padding-inline-start: 1.1rem; margin: 8px 0 0; }
+.availability-list li + li { margin-top: 8px; }
+.availability-list small { color: var(--muted); }
 .duel-row { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: center; }
 .duel-row > :last-child { text-align: right; }
 .meter, .probability { background: #28332d; border-radius: 99px; overflow: hidden; height: 6px; margin-top: 8px; }

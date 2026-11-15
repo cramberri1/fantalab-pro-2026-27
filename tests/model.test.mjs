@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzePlayer, getPlayerFixture, placeLineupPlayer, simulateLineup, validateLineup } from '../js/model.js';
+import { analyzePlayer, getAvailability, getPlayerFixture, placeLineupPlayer, simulateLineup, validateLineup } from '../js/model.js';
 
 const now = { id: 'week5', round: 5, homeId: 'a', awayId: 'b', kickoff: '2026-09-30T18:45:00Z', status: 'scheduled' };
+
+test('keeps official suspensions, injury uncertainty and historical fixtures distinct', () => {
+  const player = { id: 'one' };
+  const sourceUrl = 'https://www.legaseriea.it/comunicato';
+  const suspension = { fixtureId: now.id, playerId: player.id, status: 'suspended', kind: 'suspension',
+    sourceId: 'serie-a-disciplinary', sourceName: 'Lega Serie A', sourceUrl, publishedAt: '2026-09-25' };
+  const sanction = getAvailability(player, now, [suspension], { status: 'doubtful' });
+  assert.equal(sanction.status, 'out');
+  assert.equal(sanction.kind, 'suspension');
+  assert.equal(sanction.multiplier, 0);
+  assert.equal(sanction.sourceUrl, sourceUrl);
+  const injury = { ...suspension, kind: 'injury', sourceId: 'verified-availability' };
+  assert.equal(getAvailability(player, now, [{ ...injury, status: 'doubtful' }]).multiplier, 0.75);
+  assert.equal(getAvailability(player, now, [{ ...injury, status: 'reported' }]).multiplier, 1);
+  assert.equal(getAvailability(player, { ...now, id: 'next-match' }, [suspension]).status, 'unknown');
+});
 const fixtures = Array.from({ length: 4 }, (_, index) => ({
   id: `week${index + 1}`,
   round: index + 1,
