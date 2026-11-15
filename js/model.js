@@ -73,6 +73,24 @@ export function validateLineup(players, formation) {
   return { valid: errors.length === 0, counts, required, errors, missing };
 }
 
+export function fitLineupFormation(record, formation, roster) {
+  if (!FORMATION_OPTIONS.includes(formation)) return record;
+  const slots = validateLineup([], formation).required;
+  const starters = [];
+  const displaced = [];
+  for (const id of record.starters) {
+    const position = roster.get(id)?.position;
+    if (slots[position] > 0) {
+      starters.push(id);
+      slots[position]--;
+    } else {
+      displaced.push(id);
+    }
+  }
+  if (record.formation === formation && !displaced.length) return record;
+  return { ...record, formation, starters, reserves: [...record.reserves, ...displaced] };
+}
+
 export function placeLineupPlayer(record, roster, id, target) {
   const player = roster.get(id);
   const { role, position, playerId, after } = target;

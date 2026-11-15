@@ -1,4 +1,4 @@
-import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, getAvailability, placeLineupPlayer, sanitizeScoring } from './model.js';
+import { analyzePlayer, simulateLineup, FORMATION_OPTIONS, validateLineup, getPlayerFixture, getAvailability, fitLineupFormation, placeLineupPlayer, sanitizeScoring } from './model.js';
 import { decodeRosterCsv, makeRosterCsvId, readRosterCsv, readVotesCsv } from './roster-import.js';
 import { readMarketWorkbook } from './market-import.js';
 import { buildMarket, rankMarketReplacements, rankWeeklyMarketComparisons, compareMarketTrade, indexLeagueStatistics } from './market.js';
@@ -315,6 +315,7 @@ async function switchMode(nextMode) {
     if (dialog.open) dialog.close();
     mode = nextMode;
     dataset = loaded;
+    repairSavedLineups();
     round = rounds().includes(selectedRounds[mode]) ? selectedRounds[mode] : getRoundWindow(dataset).defaultRound;
     selectedFixtureId = undefined;
     invalidateLineupResults();
@@ -735,6 +736,13 @@ function removePlayer(id) {
 function lineupRoster() {
   return new Map(groupPlayers(modeState().roster).map(player => [player.id, player]));
 }
+function repairSavedLineups() {
+  const records = modeState().lineups;
+  const roster = lineupRoster();
+  for (const [day, record] of Object.entries(records)) {
+    records[day] = fitLineupFormation(record, record.formation, roster);
+  }
+}
 function renderLineupChange(focus) {
   const scrollTop = $('.roster-list')?.scrollTop ?? 0;
   render();
@@ -745,11 +753,20 @@ function renderLineupChange(focus) {
 function changeLineup(next, focus) {
   const state = modeState();
   lineupUndo[mode].set(round, lineupSnapshot(lineup()));
-  state.lineups[round] = lineupSnapshot(next);
+  const record = lineupSnapshot(fitLineupFormation(next, next.formation, lineupRoster()));
+  state.lineups[round] = record;
   lineupCopyPreview = false;
   invalidateLineupResults();
   save();
   renderLineupChange(focus);
+  return record;
+}
+function changeFormation(formation) {
+  const previous = lineup();
+  if (formation === previous.formation) return;
+  const next = changeLineup({ ...previous, formation }, () => $('#formation'));
+  const moved = groupPlayers(previous.starters.filter(id => !next.starters.includes(id)));
+  if (moved.length) notify(`Modulo ${formation}. In coda alla panchina: ${moved.map(player => player.name).join(', ')}.`);
 }
 function previousLineup() {
   const record = modeState().lineups[round - 1];
@@ -977,6 +994,7 @@ async function restoreBackup(text) {
   }
   invalidateLineupResults();
   lineupCopyPreview = false;
+  repairSavedLineups();
   save();
   return kept ? `Backup unito. ${kept} formazioni già presenti sono state conservate.` : 'Backup importato e unito alle rose salvate.';
 }
@@ -1814,7 +1832,10 @@ function wireEvents() {
       if (changedModes.includes(mode)) {
         lineupCopyPreview = false;
         invalidateLineupResults();
-        if (dataset) renderLineupChange();
+        if (dataset) {
+          repairSavedLineups();
+          renderLineupChange();
+        }
       }
       return;
     }
@@ -2063,9 +2084,7 @@ function wireEvents() {
       }
     }
     if (event.target.dataset.lineupRole) setLineupRole(event.target.dataset.lineupRole, value);
-    if (id === 'formation' && FORMATION_OPTIONS.includes(value)) {
-      changeLineup({ ...lineup(), formation: value }, () => $('#formation'));
-    }
+    if (id === 'formation' && FORMATION_OPTIONS.includes(value)) changeFormation(value);
     if (id === 'substitutions') {
       changeLineup({ ...lineup(), maxSubstitutions: Number(value) }, () => $('#substitutions'));
     }

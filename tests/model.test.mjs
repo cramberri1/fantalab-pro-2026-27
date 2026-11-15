@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzePlayer, getAvailability, getPlayerFixture, placeLineupPlayer, simulateLineup, validateLineup } from '../js/model.js';
+import { FORMATION_OPTIONS, analyzePlayer, fitLineupFormation, getAvailability, getPlayerFixture, placeLineupPlayer, simulateLineup, validateLineup } from '../js/model.js';
 
 const now = { id: 'week5', round: 5, homeId: 'a', awayId: 'b', kickoff: '2026-09-30T18:45:00Z', status: 'scheduled' };
 
@@ -109,6 +109,48 @@ test('formation validation counts unique players by role', () => {
   const invalid = validateLineup([...players.slice(0, -1), players[0]], '3-4-3');
   assert.equal(invalid.valid, false);
   assert.equal(invalid.missing.FWD, 1);
+});
+
+test('each Classic module transition preserves eligible starters and allows each vacancy to be filled', () => {
+  const positions = ['GK', 'DEF', 'MID', 'FWD'];
+  const players = positions.flatMap(position => Array.from({ length: 6 }, (_, slot) => ({ id: `${position}-${slot}`, position, slot })));
+  const roster = new Map(players.map(player => [player.id, player]));
+  const reserves = Object.freeze(['MID-5', 'GK-5', 'FWD-5', 'DEF-5']);
+  for (const previousFormation of FORMATION_OPTIONS) {
+    const priorCapacities = validateLineup([], previousFormation).required;
+    const starters = Object.freeze(players.filter(player => player.slot < priorCapacities[player.position]).map(player => player.id));
+    const record = Object.freeze({ formation: previousFormation, starters, reserves, maxSubstitutions: 3 });
+    for (const formation of FORMATION_OPTIONS) {
+      const capacities = validateLineup([], formation).required;
+      const kept = starters.filter(id => roster.get(id).slot < capacities[roster.get(id).position]);
+      const fitted = fitLineupFormation(record, formation, roster);
+      assert.equal(fitted.formation, formation);
+      assert.equal(fitted.maxSubstitutions, record.maxSubstitutions);
+      assert.deepEqual(fitted.starters, kept);
+      assert.deepEqual(fitted.reserves, [...reserves, ...starters.filter(id => !kept.includes(id))]);
+      if (formation === previousFormation) assert.equal(fitted, record);
+
+      let completed = fitted;
+      for (const position of positions) {
+        for (let slot = priorCapacities[position]; slot < capacities[position]; slot++) {
+          const result = placeLineupPlayer(completed, roster, `${position}-${slot}`, { role: 'starter', position });
+          assert.ok(result.starters, `${previousFormation} → ${formation}, ${position}-${slot}`);
+          completed = { ...completed, ...result };
+        }
+      }
+      assert.equal(validateLineup(completed.starters.map(id => roster.get(id)), formation).valid, true);
+    }
+  }
+});
+
+test('repairs a stored lineup with overflow or an unresolved player without promoting reserves', () => {
+  const roster = new Map([['g', { position: 'GK' }], ['a1', { position: 'FWD' }], ['a2', { position: 'FWD' }],
+    ['a3', { position: 'FWD' }], ['d', { position: 'DEF' }]]);
+  const record = { formation: '3-5-2', starters: ['a1', 'unresolved', 'g', 'a2', 'a3'], reserves: ['d'], maxSubstitutions: 2 };
+  const fitted = fitLineupFormation(record, '3-5-2', roster);
+  assert.deepEqual(fitted, { ...record, starters: ['a1', 'g', 'a2'], reserves: ['d', 'unresolved', 'a3'] });
+  assert.equal(fitLineupFormation(fitted, fitted.formation, roster), fitted);
+  assert.equal(fitLineupFormation(record, 'unsupported', roster), record);
 });
 
 test('lineup placement fills vacancies and swaps only players of the same role', () => {

@@ -58,6 +58,7 @@ export function renderRosa({
         <div class="actions"><button type="button" data-lineup-copy-confirm>Sostituisci formazione</button><button type="button" data-lineup-copy-cancel>Mantieni quella attuale</button></div></div>` : ''}
       <div class="lineup-controls"><label class="field-label">Modulo<select id="formation">${FORMATION_OPTIONS.map(f => `<option value="${f}" ${f === record.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
         <label class="field-label">Max cambi<select id="substitutions">${[0,1,2,3,4,5].map(n => `<option value="${n}" ${n === record.maxSubstitutions ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
+      <p class="inline-status">Cambiando modulo, i titolari in eccesso passano in coda alla panchina. Puoi scegliere chi inserire nei posti liberi.</p>
       ${pitch(record, validation, context)}
       ${!validation.valid && starters.length ? `<p class="inline-status">${html(validation.errors.join(' '))}</p>` : ''}
       <div class="duel lineup-bench"><h3>Panchina</h3><p>Priorità dall’alto verso il basso. Sostituzioni fra calciatori dello stesso ruolo.</p>
